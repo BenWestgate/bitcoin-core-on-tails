@@ -4,6 +4,7 @@
 
 Only the latest version will be supported with
 security updates.
+We aim to make a major release every 6-7 months.
 
 ## Reporting a Vulnerability
 
