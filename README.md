@@ -1,10 +1,13 @@
 # Bitcoin Core on Tails
 
-This repository contains a Tails setup script for encrypted Persistent Storage, a full node, wallet and quick redundant and theft resistant paper seed backup.
+This repository contains a Tails setup script for encrypted Persistent Storage, a full node, wallet and a simple, redundant yet theft resistant paper seed backup.
 
 See Also:
+
 https://tails.boum.org/about/index.en.html
+
 https://bitcoincore.org/en/about/
+
 
 
 ## How to use this script
