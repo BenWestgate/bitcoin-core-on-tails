@@ -12,6 +12,8 @@ https://bitcoincore.org/en/about/
 
 ## How to use this script
 
+If you know someone you trust who uses Bitcoin Core on Tails already, you can install by cloning their Tails:
+
 1. Clone it from GitHub.
     * There is no reason to fork it.
 1. Create a new local repository and copy the files from this repo into it.
