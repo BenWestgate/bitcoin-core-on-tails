@@ -14,9 +14,13 @@ https://bitcoincore.org/en/about/
 
 If you know someone you trust who uses Bitcoin Core on Tails already, you can install by cloning their Tails skipping the slow initial block download.
 
-1. Clone it from GitHub.
-    * There is no reason to fork it.
-1. Create a new local repository and copy the files from this repo into it.
+1. Install Tails. https://tails.boum.org/install/index.en.html
+   * If you know someone you trust who uses Tails already, you can install your Tails by cloning their Tails:
+1. Start Tails and set up an administration password. https://tails.boum.org/install/linux?back=1 https://tails.boum.org/doc/first_steps/welcome_screen/administration_password/index.en.html
+1. 
+1. Download this repository from GitHub.
+1. Extract the files, open a terminal where you extracted by right clicking, 'open in terminal' and then type './ init'.
+1. Follow the Instructions on Screen.
 1. Modify README.md and docs/contributing.md to represent your project, not the
    template project.
 1. Develop your new project!
