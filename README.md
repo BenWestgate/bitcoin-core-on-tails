@@ -1,13 +1,23 @@
 # Bitcoin Core on Tails
 
-This repository contains a Tails setup script for encrypted Persistent Storage, a full node, wallet and a simple, redundant yet theft resistant paper seed backup.
+This repository contains a script for installing Bitcoin Core to Tails.
+
+
+Bitcoin Core connects to the Bitcoin peer-to-peer network to download and fully validate blocks and transactions. It also includes a wallet and graphical user interface.
+
+Tails is a portable operating system that protects against surveillance and censorship. It connects to the Internet exclusively through the anonymity network Tor.
 
 See Also:
 
-https://tails.boum.org/about/index.en.html
+[Bitcoin Core :: About](https://bitcoincore.org/en/about/)
 
-https://bitcoincore.org/en/about/
+[Full Validation - Bitcoin Core Features](https://bitcoin.org/en/bitcoin-core/features/validation)
 
+[Excellent Privacy - Bitcoin Core Features](https://bitcoin.org/en/bitcoin-core/features/privacy)
+
+[Tails - How Tails works](https://tails.boum.org/about/index.en.html)
+
+[Tails (operating system) - Wikipedia](https://en.wikipedia.org/wiki/Tails_(operating_system))
 
 
 ## How to use this script
