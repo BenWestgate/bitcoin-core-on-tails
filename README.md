@@ -1,4 +1,4 @@
-# Bitcoin Core on Tails
+# Bitcoin Core on Tails (aka Bails, aka BCoT)
 
 This repository contains a script for installing Bitcoin Core to Tails.
 
@@ -33,7 +33,7 @@ If you know someone you trust who uses Bitcoin Core on Tails already, you can in
 5. Open a terminal. Choose <b>Applications ▸ Utilities ▸ Terminal</b>
 6.  Type or Paste the following in Terminal, then press Enter:
 ``` bash
-git clone https://github.com/benwestgate/bitcoin-core-on-tails; cd bitcoin-core-on-tails; ./init
+git clone https://github.com/benwestgate/BCoT; cd BCoT; /bin/bash init
 
 ```
 6. Follow the Instructions on Screen.
