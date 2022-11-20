@@ -600,7 +600,7 @@ cd $HOME/Persistent || cd $HOME/Downloads
 [ "$1" == '--download' ] && { download 2 ; exit 0 ; }
 # get current cloud compute spot prices from Google and BTC price if not yet downloaded or older than
 assumed_chain_state_size=$(wget --output-document - https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp | grep --max-count=1 m_assumed_chain_state_size | sed 's/[^0-9]*//g') & get_size=$!
-{ test -f all-pricing_* && [ $(stat --format=%Y all-pricing) -gt $(date --date='30 days ago' +%s) ] || { until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com/compute/all-pricing; do sleep $((++k * (RANDOM%3+1) / 2)); done ; until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com$(grep --max-count=1 "<devsite-iframe>" all-pricing | cut -f2 -d'"'); do sleep $((++k * (RANDOM%3+1) / 2)); done ; }
+{ test -f all-pricing_* && [ $(stat --format=%Y all-pricing) -gt $(date --date='30 days ago' +%s) ] || { until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com/compute/all-pricing; do sleep $((++k * (RANDOM%3+1) / 2)); done ; until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused "$(grep --max-count=1 "<devsite-iframe>" all-pricing | cut -f2 -d'"')"; do sleep $((++k * (RANDOM%3+1) / 2)); done ; }
 test -f btc-to-usd.htm && [ $(stat --format=%Y btc-to-usd.htm) -gt $(date --date='1 hour ago' +%s) ] || wget --timestamping https://www.unitconverters.net/currency/btc-to-usd.htm
 } & price=$!
 echo '#!/bin/bash
