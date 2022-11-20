@@ -594,8 +594,9 @@ $(tput setaf 4)Enter '$(tput bold)q$(tput sgr0)$(tput setaf 4)' after you've imp
 ####### execution begins here #######
 printf '\033]2;Bitcoin Core on Tails setup\a'
 [ "$1" ] || [ $(lsblk --raw $RUNNING_DEVICE | grep part | wc --lines) -gt 1 ] && { zenity --notification --text="Running Device ($RUNNING_DEVICE) already partitioned."; gnome-disks $RUNNING_DEVICE & sleep 2; exit 1; }
-set -m	# enables job control so download can be foregrounded if password creation finishes first
-test -f $HOME/.bitcoin/debug.log && cd $HOME/Persistent || { cd $HOME/Downloads; sleep 30; wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/; } & dl=$!
+set -m	# enables job control so downloads can be foregrounded if password creation finishes first
+cd $HOME/Persistent || cd $HOME/Downloads
+{sleep 30; wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/; } & dl=$!
 [ "$1" == '--download' ] && { download 2 ; exit 0 ; }
 # get current cloud compute spot prices from Google and BTC price if not yet downloaded or older than
 assumed_chain_state_size=$(wget --output-document - https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp | grep --max-count=1 m_assumed_chain_state_size | sed 's/[^0-9]*//g') & get_size=$!
