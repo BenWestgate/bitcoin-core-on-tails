@@ -608,7 +608,7 @@ zenity --password --title="Bitcoin Core on Tails"' > askpass
 export SUDO_ASKPASS=askpass
 chmod +x askpass
 sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo	# removes prompting for every sudo password every command, asks second time if file renamed
-[ "$1" != '--clone' ] && { zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200 & tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ ; } &>>log &
+[ "$1" != '--clone' ] && { zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200 & sleep 30; tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ ; } &>>log &
 # TODO clones should reencrypt the data in case the temporary password was photographed, emailed or some other difficult to wipe media was used.  Refuse to create wallets until complete.
 [ "$1" == '--first-run' ] && { bitcoind &>/dev/null & benchmark 1 ; passphrase 0 ; new_wallet ; } || temp_pass=$(keepassxc-cli generate --exclude-similar --lower --numeric --length=24)
 mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked' || add_part $RUNNING_DEVICE $temp_pass '/live/persistence/TailsData_unlocked'
