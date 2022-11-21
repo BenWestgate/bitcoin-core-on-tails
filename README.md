@@ -33,7 +33,7 @@ If you know someone you trust who uses Bitcoin Core on Tails already, you can in
 5. Open a terminal. Choose <b>Applications ▸ Utilities ▸ Terminal</b>
 6.  Type or Paste the following in Terminal, then press Enter:
 ``` bash
-git clone https://github.com/benwestgate/bitcoin-core-on-tails; /bin/bash bitcoin-core-on-tails/init
+git clone https://github.com/benwestgate/bitcoin-core-on-tails; bash bitcoin-core-on-tails/init
 
 ```
 6. Follow the Instructions on Screen.
