@@ -181,19 +181,19 @@ benchmark () {
 	pass=$RANDOM
 	echo $pass | sudo cryptsetup luksFormat --pbkdf-memory=65536 --pbkdf-force-iterations=4 --batch-mode "$test_img"
 	# time in seconds to reach 64MiB of RAM used for Argon2
-	elapsed="$( TIMEFORMAT='%E';time ( echo $pass | sudo cryptsetup open "$test_img" --test-passphrase ) 2>&1 1>/dev/null)"
+	elapsed_64="$( TIMEFORMAT='%E';time ( echo $pass | sudo cryptsetup open "$test_img" --test-passphrase ) 2>&1 1>/dev/null)"
 	echo $pass | sudo cryptsetup luksConvertKey --pbkdf-memory=524288 --pbkdf-force-iterations=4 --batch-mode "$test_img"
 	# time in seconds to reach 512MiB of RAM used for Argon2
-	iter_time="$( TIMEFORMAT='%E';time ( echo $pass | sudo cryptsetup open "$test_img" --test-passphrase ) 2>&1 1>/dev/null)"
-	fillrate=$(echo "458752 / ($iter_time - $elapsed)" | bc -l)	# Argon2 memory fill rate in kB/s
+	elapsed_512="$( TIMEFORMAT='%E';time ( echo $pass | sudo cryptsetup open "$test_img" --test-passphrase ) 2>&1 1>/dev/null)"
+	fillrate=$(echo "458752 / ($elapsed_512 - $elapsed_64)" | bc -l)	# Argon2 memory fill rate in kB/s
+	iter_time=$(echo "2^20 /$fillrate * 1000" | bc -l)	# time in ms to fill 1 GiB
 	fillrate=${fillrate%.*}	# convert to integer
-	iter_time=$(echo "$iter_time * 1000" | bc -l)	# converts to milliseconds
 	iter_time=${iter_time%.*}	# converts to integer
-	readonly DEFAULT_ITER=$(( iter_time < 2000 ? 2000 * $1 : iter_time * $1))	# default iteration time
+	readonly DEFAULT_ITER=$(( $iter_time < 2000 ? 2000 * $1 : iter_time * $1))	# default iteration time
 	max_memory_cost=$DEFAULT_MAX_MEMORY
-	DEFAULT_COST=$(iter_time=$DEFAULT_ITER; get_guess_cost)
-	MIN_COST=$(iter_time=$((DEFAULT_ITER/10)); get_guess_cost)
-	MAX_COST=$(iter_time=$((DEFAULT_ITER*10)); get_guess_cost)
+	DEFAULT_COST=$(iter_time=$((DEFAULT_ITER/1000)); get_guess_cost)
+	MIN_COST=$(iter_time=$((DEFAULT_ITER/10000)); get_guess_cost)
+	MAX_COST=$(iter_time=$((DEFAULT_ITER/100)); get_guess_cost)
 	shred --remove "$test_img"
 }
 
@@ -204,10 +204,10 @@ benchmark () {
 #		iter_time
 #		fillrate
 # Outputs:
-#		guess_cost in kBms on standard out
+#		guess_cost in kB*s on standard out
 #######################################
 get_guess_cost () {
-	memory_cost=$((iter_time * fillrate / 1000 < max_memory_cost ? iter_time * fillrate / 1000 : max_memory_cost))
+	memory_cost=$((iter_time * fillrate < max_memory_cost ? iter_time * fillrate : max_memory_cost))
 	guess_cost=$((iter_time * memory_cost))
 	echo $guess_cost
 }
@@ -223,7 +223,7 @@ get_guess_cost () {
 #################################################
 passphrase () {
 	printf '\033]2;Choose Screen Lock and Full Disk Encryption passphrase\a'
-	(( played )) || { {sleep 150; totem --quit &>/dev/null; } & totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>/dev/null; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
+	(( played )) || { { sleep 150; totem --quit &>/dev/null; } & totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>/dev/null; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
 	played=1
 	clear -x
 	echo -e "Choose Screen Lock and Full Disk Encryption Passphrase
@@ -449,23 +449,20 @@ $((TOTAL_RAM/2))" | sort | head -1)
 	# iteration times get adjusted upward, if necessary, to compensate for less memory to keep total attack cost the same.
 	unset iter_value
 	unset new_ram_required
-	for kBms in "$3" "$MIN_COST" "$MAX_COST"; do
-		unsaturated=$(echo "sqrt(1000 * $kBms / $fillrate)" | bc )
-		saturated=$((kBms / max_memory_cost))
+	for kBs in "$3" "$MIN_COST" "$MAX_COST"; do
+		unsaturated=$(echo "sqrt($kBs / $fillrate)" | bc )
+		saturated=$((kBs / max_memory_cost))
 		iter_value+=( $((saturated > unsaturated ? saturated : unsaturated )) )	# milliseconds
 	done
-	echo $max_memory_cost
-	echo ${iter_value[@]}
 	iter_time=$iter_value
 	crack_estimate
-	step=$(( (${iter_value[2]} - ${iter_value[1]})/99 ))
 	iter=$(mktemp)
 	printf $iter_time > $iter
 	printf '\033]2;Passphrase cracking cost\a'
 	while read iter_time; do
 		crack_estimate
 		printf $iter_time > $iter	#FIXME change this to a 1 second granuarity if anyone else feels this way.
-	done < <(zenity --scale --title='Encryption settings' --text='Specify how much key stretching is done.\n\nHigher values offer more protection, but each Tails start-up will be this much longer.\nTerminal shows impact on cracking cost.\n\nDecryption Time (milliseconds):' --value=$iter_time --min-value=${iter_value[1]} --step=$step --max-value=${iter_value[2]} --print-partial)
+	done < <(zenity --scale --title='Encryption settings' --text='Specify how much key stretching is done.\n\nHigher values offer more protection, but each Tails start-up will be this much longer.\nTerminal shows impact on cracking cost.\n\nDecryption Time (seconds):' --value=$iter_time --min-value=$((${iter_value[1]}>0 ? ${iter_value[1]} : 1 )) --step=1 --max-value=${iter_value[2]} --print-partial)
 	iter_time=$(<$iter)
 	shred --remove $iter
 	get_guess_cost > /dev/null
@@ -595,12 +592,11 @@ $(tput setaf 4)Enter '$(tput bold)q$(tput sgr0)$(tput setaf 4)' after you've imp
 printf '\033]2;Bitcoin Core on Tails setup\a'
 [ "$1" ] || [ $(lsblk --raw $RUNNING_DEVICE | grep part | wc --lines) -gt 1 ] && { zenity --notification --text="Running Device ($RUNNING_DEVICE) already partitioned."; gnome-disks $RUNNING_DEVICE & sleep 2; exit 1; }
 set -m	# enables job control so downloads can be foregrounded if password creation finishes first
-cd $HOME/Persistent || cd $HOME/Downloads
-wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/ & dl=$!
+test -f $HOME/.bitcoin/debug.log && cd $HOME/Persistent || { cd $HOME/Downloads; wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/ & dl=$!; }
 [ "$1" == '--download' ] && { download 2 ; exit 0 ; }
 # get current cloud compute spot prices from Google and BTC price if not yet downloaded or older than
 assumed_chain_state_size=$(wget --output-document - https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp | grep --max-count=1 m_assumed_chain_state_size | sed 's/[^0-9]*//g') & get_size=$!
-{ test -f all-pricing_* && [ $(stat --format=%Y all-pricing) -gt $(date --date='30 days ago' +%s) ] || { until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com/compute/all-pricing; do sleep $((++k * (RANDOM%3+1) / 2)); done ; until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused "$(grep --max-count=1 "<devsite-iframe>" all-pricing | cut -f2 -d'"')"; do sleep $((++k * (RANDOM%3+1) / 2)); done ; }
+{ test -f all-pricing_* && [ $(stat --format=%Y all-pricing) -gt $(date --date='30 days ago' +%s) ] || { until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com/compute/all-pricing; do sleep $((++k * (RANDOM%3+1) / 2)); done ; until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused $(grep --max-count=1 "<devsite-iframe>" all-pricing | cut -f2 -d'"'); do sleep $((++k * (RANDOM%3+1) / 2)); done ; }
 test -f btc-to-usd.htm && [ $(stat --format=%Y btc-to-usd.htm) -gt $(date --date='1 hour ago' +%s) ] || wget --timestamping https://www.unitconverters.net/currency/btc-to-usd.htm
 } & price=$!
 echo '#!/bin/bash
@@ -646,3 +642,4 @@ sudo mv /etc/sudoers.d/always-ask-password{.bak,} &>>log &	# restores default su
 
 # give this shutdown info to newly setup passphrases.
 # https://tails.boum.org/doc/first_steps/shutdown/index.en.html
+
