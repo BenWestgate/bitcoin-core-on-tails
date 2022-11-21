@@ -223,7 +223,7 @@ get_guess_cost () {
 #################################################
 passphrase () {
 	printf '\033]2;Choose Screen Lock and Full Disk Encryption passphrase\a'
-	(( played )) || totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>/dev/null & { sleep 150; totem --quit &>/dev/null; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
+	(( played )) || { {sleep 150; totem --quit &>/dev/null; } & totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>/dev/null; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
 	played=1
 	clear -x
 	echo -e "Choose Screen Lock and Full Disk Encryption Passphrase
