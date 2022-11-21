@@ -223,7 +223,7 @@ get_guess_cost () {
 #################################################
 passphrase () {
 	printf '\033]2;Choose Screen Lock and Full Disk Encryption passphrase\a'
-	(( played )) || totem --fullscreen https://archive.org/download/how-to-make-a-super-secure-password/CT-SHORTEXPLAINER-EFF-PASSWORDS-220415-FINAL.ogv &>/dev/null & { sleep 190; totem --quit &>/dev/null; } & # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
+	(( played )) || totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>/dev/null & { sleep 150; totem --quit &>/dev/null; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
 	played=1
 	clear -x
 	echo -e "Choose Screen Lock and Full Disk Encryption Passphrase
@@ -596,7 +596,7 @@ printf '\033]2;Bitcoin Core on Tails setup\a'
 [ "$1" ] || [ $(lsblk --raw $RUNNING_DEVICE | grep part | wc --lines) -gt 1 ] && { zenity --notification --text="Running Device ($RUNNING_DEVICE) already partitioned."; gnome-disks $RUNNING_DEVICE & sleep 2; exit 1; }
 set -m	# enables job control so downloads can be foregrounded if password creation finishes first
 cd $HOME/Persistent || cd $HOME/Downloads
-{ sleep 30; wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/; } & dl=$!
+wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/ & dl=$!
 [ "$1" == '--download' ] && { download 2 ; exit 0 ; }
 # get current cloud compute spot prices from Google and BTC price if not yet downloaded or older than
 assumed_chain_state_size=$(wget --output-document - https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp | grep --max-count=1 m_assumed_chain_state_size | sed 's/[^0-9]*//g') & get_size=$!
@@ -609,7 +609,7 @@ zenity --password --title="Bitcoin Core on Tails"' > askpass
 export SUDO_ASKPASS=askpass
 chmod +x askpass
 sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo	# removes prompting for every sudo password every command, asks second time if file renamed
-[ "$1" != '--clone' ] && { zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200 & sleep 30; tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ ; } &>>log &
+[ "$1" != '--clone' ] && { zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200 & tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ ; } &>>log &
 # TODO clones should reencrypt the data in case the temporary password was photographed, emailed or some other difficult to wipe media was used.  Refuse to create wallets until complete.
 [ "$1" == '--first-run' ] && { bitcoind &>/dev/null & benchmark 1 ; passphrase 0 ; new_wallet ; } || temp_pass=$(keepassxc-cli generate --exclude-similar --lower --numeric --length=24)
 mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked' || add_part $RUNNING_DEVICE $temp_pass '/live/persistence/TailsData_unlocked'
