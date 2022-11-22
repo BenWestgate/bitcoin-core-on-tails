@@ -579,7 +579,7 @@ get_key() {
 	sleep $((zzz*(16384+RANDOM)/32767))
 	echo -e "\n\n\n$(tput setaf 2)Enter '$(tput bold)1$(tput sgr0)$(tput setaf 2)' if you find this individual trustworthy$(tput sgr0), $(tput setaf 1)otherwise press $(tput bold)Enter$(tput sgr0),
 $(tput setaf 4)Enter '$(tput bold)q$(tput sgr0)$(tput setaf 4)' after you've imported a few trustworthy keys to check signatures.$(tput sgr0)"
-	gpg --search-keys $1 || { return 1; ((++zzz)); }	# TODO if users get banned from keyserver again introduce a fallback
+	gpg --search-keys $1 || { ((++zzz)); return 1; }	# TODO if users get banned from keyserver again introduce a fallback
 	#echo -e "\n\n\n"	# TODO see if these improve the view
 }
 
@@ -587,6 +587,8 @@ passphrase_education() {
 	zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200
 	{ { tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ & sleep 140; totem --quit; } &>>log & totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>>log; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
 }
+
+#TODO put all my wait to retry download code in a unified function w/ local variables. for clarity.
 
 #####################################
 ####### execution begins here #######
@@ -611,22 +613,22 @@ sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --ask
 [ "$1" == '--first-run' ] && { bitcoind &>/dev/null & benchmark 1 ; passphrase 0 ; new_wallet ; } || temp_pass=$(keepassxc-cli generate --exclude-similar --lower --numeric --length=24)
 mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked' || add_part $RUNNING_DEVICE $temp_pass '/live/persistence/TailsData_unlocked'
 sudo mv askpass /usr/local/bin
-sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache	# changes bitcoin: uri handling to bitcoin-qt
 #FIXME move ALL security critical instructions and scripts to read-only directories.
 if ! test -f $HOME/.bitcoin/debug.log; then
 	benchmark 1
 	passphrase 0
 	download 2
-	rsync -a --remove-source-files --exclude='*log' . "$mnt_pnt"/Persistent
 	rsync -a --remove-source-files "$BCOT_DIR" "$mnt_pnt"/Persistent
 	ps -p $get_size > /dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
 	assumed_chain_state_size=$(grep --max-count=1 m_assumed_chain_state_size chainparams.cpp | sed 's/[^0-9]*//g')
+	rsync -a --remove-source-files --exclude='*log' . "$mnt_pnt"/Persistent
+	sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache	# changes bitcoin: uri handling to bitcoin-qt
 	echo '[Desktop Entry]
 Type=Application
 Name=Bitcoin
 Exec=/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907))
 Terminal=false
-Hidden=false' | sudo tee autostart/bitcoin.desktop
+Hidden=false' | sudo tee /etc/xdg/autostart/bitcoin.desktop
 	echo '[Desktop Entry]
 Version=1.0
 Name=Bitcoin Core
@@ -640,8 +642,8 @@ Type=Application
 Icon=/usr/local/share/pixmaps/bitcoin128.png
 MimeType=x-scheme-handler/bitcoin;
 Categories=Office;Finance;P2P;Network;Qt;
-StartupWMClass=Bitcoin-qt' | sudo tee local/share/applications/bitcoin-qt.desktop
-	gnome-system-monitor --simple --show-resources-tab
+StartupWMClass=Bitcoin-qt' | sudo tee /usr/local/share/applications/bitcoin-qt.desktop
+	gnome-system-monitor --simple --show-resources-tab &
 	gtk-launch bitcoin-qt
 	gnome-terminal --title='Running bitcoin' -- bash -c 'while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done'
 	sleep 2
