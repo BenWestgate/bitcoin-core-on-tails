@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=₿ails (Bitcoin Core on Tails)
+Comment=Clone, Backup or Wipe Bails and Configure Settings
+Exec=/usr/local/bin/bails_menu.sh
+Terminal=false
+Type=Application
+Icon=/usr/local/share/pixmaps/bails128.png
+Categories=Office;System;Finance;P2P;Network;Qt;
+StartupWMClass=bails
