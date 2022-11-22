@@ -28,6 +28,7 @@
 # If --first-run parameter is used, the temporary passphrase on a booted clone will be changed and data reencrypted for forward secrecy from friend you cloned from.
 # If --backup parameter is used, it creates an exact copy for yourself to archive
 # If --download parameter is used, it will download the latest bitcoin core on the currently running persistent tails, check signatures and install it.
+# TODO test UX OPTIMIZATION: Download SHA256SUMS and SHA256SUMS.asc first, to verify signatures while Bitcoin downloads in the background.
 # TODO replace echo/printf "" | command with command <<< ""
 # above is the beginning of a menu for the different app features.
 # TODO fix mounted directories having a copy of themselves inside
@@ -66,7 +67,7 @@ mnt_pnt='/live/persistence/TailsData_unlocked'
 # Adds a second partition to device named TailsData to create a new persistent storage
 # Parameters:
 #	$1 = device to add persistence to
-#	$2 = Encrypted Persistent Storage Passphrase
+#	$2 = encrypted Persistent Storage Passphrase
 #	$3 = mount point for persistence filesystem.
 #################################################
 add_part () {		# TODO later this only runs no TailsData partition on selected device
@@ -108,7 +109,7 @@ q" | sudo parted $1		# labels it TailsData
 /usr/local	source=local
 /etc/xdg/autostart	source=autostart" | sudo tee persistence.conf
 	temp_file=$(mktemp)
-	sudo cat persistence.conf > $temporary_file
+	sudo cat persistence.conf > $temp_file
 	while read -r line; do
 		target=$(echo $line | cut -f1 -d' ')
 		source=$(echo $line | cut -f2 -d=)
@@ -118,7 +119,7 @@ q" | sudo parted $1		# labels it TailsData
 	done <$temp_file
 	sudo cp -a $BCOT_DIR/{bin,share} local
 	sudo cp -a $BCOT_DIR/init local/bin/init	# copies this script into /usr/local/bin/
-	sudo mkdir -p Persistent/.bitcoin/wallets
+	sudo mkdir -p Persistent/.bitcoin/wallets local/share/applications
 	shred --remove $temp_file
 	# FIXME Add about to prune notice by looking at the newest blockXXXX.dat when a deletion diff was made to settings.json to alert user when these are expected to prune off.
 	ln --symbolic $HOME/debug.log $HOME/.bitcoin/debug.log	# moves debug log to amnesia so it doesn't persist restarts
@@ -146,27 +147,6 @@ fUseProxy=true
 nDisplayUnit=3
 strDataDir=/home/amnesia/.bitcoin
 strThirdPartyTxUrls=explorerzydxu5ecjrkwceayqybizmpjjznk5izmitf2modhcusuqlid.onion/tx/%s" > Persistent/.config/Bitcoin/Bitcoin-Qt.conf
-	ps -p $get_size > /dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
-	echo '[Desktop Entry]
-Type=Application
-Name=Bitcoin
-Exec=/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907))
-Terminal=false
-Hidden=false' | sudo tee autostart/bitcoin.desktop
-	echo '[Desktop Entry]
-Version=1.0
-Name=Bitcoin Core
-Comment=Connect to the Bitcoin P2P Network
-Comment[de]=Verbinde mit dem Bitcoin peer-to-peer Netzwerk
-Comment[fr]=Bitcoin, monnaie virtuelle cryptographique pair à pair
-Comment[tr]=Bitcoin, eşten eşe kriptografik sanal para birimi
-Exec=/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907)) %u
-Terminal=false
-Type=Application
-Icon=/usr/local/share/pixmaps/bitcoin128.png
-MimeType=x-scheme-handler/bitcoin;
-Categories=Office;Finance;P2P;Network;Qt;
-StartupWMClass=Bitcoin-qt' | sudo tee local/share/applications/bitcoin-qt.desktop
 	cd -
 }
 
@@ -198,7 +178,7 @@ benchmark () {
 }
 
 #######################################
-# Get crack cost estimate in kB * ms
+# Get crack cost estimate in kB * s
 # Inputs:
 # 		max_memory_cost
 #		iter_time
@@ -223,8 +203,6 @@ get_guess_cost () {
 #################################################
 passphrase () {
 	printf '\033]2;Choose Screen Lock and Full Disk Encryption passphrase\a'
-	(( played )) || { { sleep 150; totem --quit &>/dev/null; } & totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>/dev/null; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
-	played=1
 	clear -x
 	echo -e "Choose Screen Lock and Full Disk Encryption Passphrase
    $(tput bold)Hints for passwords$(tput sgr0)
@@ -365,7 +343,7 @@ Bitcoin data will be stored in an encrypted form protected by your passphrase."
 #	Arguments:  $1 = optional temporary password , will prompt if not provided 
 #######################################
 change_key () {
-	[ "$1" ] || temp_pass=$(zenity --password --title='Enter temporary Encrypted Persistent Storage password')
+	[ "$1" ] || temp_pass=$(zenity --password --title='Enter temporary encrypted Persistent Storage password')
 	echo "$temp_pass
 $pass
 " | sudo cryptsetup luksChangeKey --batch-mode --pbkdf-memory=$max_memory_cost --iter-time=$iter_time ${device} || change_key "$1"
@@ -434,7 +412,7 @@ When you have come up with one,
 # Arguments:
 #	$1 = target max memory cost in kiB
 #	$2 = lowest target system RAM in GiB
-#	$3 = initial attack cost for slider in kB * ms
+#	$3 = initial attack cost for slider in kB * s
 #		
 #######################################
 tune_cost () {
@@ -443,33 +421,39 @@ tune_cost () {
 	# TOTAL_RAM / 2 , depends on system memory
 	# AVAILABLE , depends on system memory and usage
 	# TODO double check the minimum values preserve crack cost
+	zenity --info --text="$1\n$AVAILABLE\n$((TOTAL_RAM/2))"
 	max_memory_cost=$(echo "$1
 $AVAILABLE
-$((TOTAL_RAM/2))" | sort | head -1)
-	# iteration times get adjusted upward, if necessary, to compensate for less memory to keep total attack cost the same.
+$((TOTAL_RAM/2))" | sort --numeric-sort | head -1)
+	zenity --info --text="max memory cost $max_memory_cost"
+	# adjust iteration times upward, if necessary, to compensate for less memory to keep total attack cost similar.
 	unset iter_value
-	unset new_ram_required
 	for kBs in "$3" "$MIN_COST" "$MAX_COST"; do
 		unsaturated=$(echo "sqrt($kBs / $fillrate)" | bc )
 		saturated=$((kBs / max_memory_cost))
-		iter_value+=( $((saturated > unsaturated ? saturated : unsaturated )) )	# milliseconds
+		iter_value+=( $((saturated > unsaturated ? saturated : unsaturated )) )
 	done
+
 	iter_time=$iter_value
 	crack_estimate
 	iter=$(mktemp)
+	step=$(((iter_value[2] - iter_value[1])/19))
+	(( iter_value[1] )) || iter_value[1]=1
 	printf $iter_time > $iter
 	printf '\033]2;Passphrase cracking cost\a'
 	while read iter_time; do
 		crack_estimate
 		printf $iter_time > $iter	#FIXME change this to a 1 second granuarity if anyone else feels this way.
-	done < <(zenity --scale --title='Encryption settings' --text='Specify how much key stretching is done.\n\nHigher values offer more protection, but each Tails start-up will be this much longer.\nTerminal shows impact on cracking cost.\n\nDecryption Time (seconds):' --value=$iter_time --min-value=$((${iter_value[1]}>0 ? ${iter_value[1]} : 1 )) --step=1 --max-value=${iter_value[2]} --print-partial)
+	done < <(zenity --scale --title='Encryption settings' --text='Specify how much key stretching is done.\n\nHigher values offer more protection, but each Tails start-up will be this much longer.\nTerminal shows impact on cracking cost.\n\nDecryption Time (seconds):' --value=$iter_time --min-value=${iter_value[1]} --step=$step --max-value=${iter_value[2]} --print-partial)
 	iter_time=$(<$iter)
 	shred --remove $iter
 	get_guess_cost > /dev/null
-	ram_required=$(((TOTAL_RAM - AVAILABLE + memory_cost + 2 ** 20 -1)/2 ** 20))	# minimum system requirement , since 2 GB is the Tails minimum Req we can warn if exceeding that.
+	ram_required=$(((TOTAL_RAM - AVAILABLE + memory_cost + 2**20 - 1)/2**20))	# minimum system requirement , since 2 GB is the Tails minimum Req we can warn if exceeding that.
+	zenity --info --text="$ram_required required\n$memory_cost mem cost"
 	(( ram_required <= $2 )) && return
-	zenity --title='Memory system requirement' --width=300 --question --text="Your encryption setting will require at least <b>$ram_required GB</b> of memory to open the Encrypted Persistent Storage.\n\nYou may reduce the Memory required to be compatible on other PCs with less than $ram_required GB RAM. This may lengthen decryption time.\n\nOtherwise, click Continue." --cancel-label='Continue' --ok-label='Reduce RAM' --default-cancel || return && \
+	zenity --title='Memory system requirement' --width=320 --question --text="Your encryption setting will require at least <b>$ram_required GB</b> of memory to open the encrypted Persistent Storage.\n\nYou may reduce the Memory required to be compatible on other PCs with less than $ram_required GB RAM. This may lengthen decryption time.\n\nOtherwise, click Continue." --cancel-label='Continue' --ok-label='Reduce RAM' --default-cancel || return && \
 	(( --ram_required > $2 )) && ram_required=$(zenity --scale --title='Reduce memory required' --text='Reduce the GB RAM Required to:' --value=$ram_required --min-value=$2 --max-value=$ram_required --step=1)
+	zenity --info --text="parameter 1: $((ram_required * 2**20 + AVAILABLE - TOTAL_RAM))\nparameter 2:$ram_required\n guess cost: $guess_cost"
 	[ "$ram_required" ] && tune_cost $((ram_required * 2**20 + AVAILABLE - TOTAL_RAM)) $ram_required $guess_cost
 }
 
@@ -529,18 +513,28 @@ Recommendation:
 #		Installs Bitcoin to /live/persistence/TailsData_unlocked/local.
 #######################################
 download () {
+	printf '\033]2;Downloading Bitcoin Core signatures...\a'
+	wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
+	cd $(ls -dt bitcoin-core* | head -1)
+	# get builder-keys and delete shitcoiners
+	wget --continue https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/builder-keys/keys.txt
+	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" keys.txt > keys
+	verify $1 # finds 2 trustworthy attestations from keys.txt for the download checksum
+	cd -
 	printf '\033]2;Downloading Bitcoin Core...\a'
 	# brings the started in background download to foreground so user can see progress.
 	ps -p $dl > /dev/null && fg %$(jobs -l | grep $dl | cut -f1 -d' ' | tr -c -d '[:digit:]') || wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
 	rm -R download *.tmp
 	cd $(ls -dt bitcoin-core* | head -1)
-	sha256sum --ignore-missing --check SHA256SUMS || { echo "Download Integrity Failure: Checksum does not match what was expected." ; sleep 5 ; exit 1 ; }
-	# get builder-keys and delete shitcoiners
-	wget --continue https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/builder-keys/keys.txt
-	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" keys.txt > keys
-	verify $1 # finds 2 trustworthy attestations from keys.txt for the download checksum
-	sudo --askpass tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/live/persistence/TailsData_unlocked/local
-	{ sleep 5; zenity --title=README.md --text-info --filename=/live/persistence/TailsData_unlocked/local/README.md --width=560 --height=580 --timeout=30; } & # displays the README.md for 30 seconds.
+	sha256sum --ignore-missing --check SHA256SUMS || { echo "Download Integrity Failure: Checksum does not match what was expected." ; rm --verbose *.tar.*; sleep 5 ; exit 1 ; }
+	test -f $HOME/.bitcoin/bitcoind.pid && kill $(<$HOME/.bitcoin/bitcoind.pid)
+	while test -f $HOME/.bitcoin/bitcoind.pid; do
+		kill $(<$HOME/.bitcoin/bitcoind.pid)
+		pkill bitcoin*
+		sleep 1
+	done
+	sudo --askpass tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/usr/local
+	{ sleep 5; zenity --title=README.md --text-info --filename=/usr/local/README.md --width=560 --height=580 --timeout=30; } & # displays the README.md for 30 seconds.
 }
 
 #######################################
@@ -550,7 +544,7 @@ download () {
 #######################################
 verify () {
 	printf '\033]2;Verify Bitcoin Core download signatures\a'
-	[ "$2" ] || zenity --info --title="Confirm fingerprint belongs to Trusted signer." --text="Before designating an individual trustworthy, you need to confirm that the signing key's fingerprint \(e.g. 0xE777299F...\) listed below their name matches what you had expected for this signers public key." --width=450 &
+	[ "$2" ] || zenity --info --title="Confirm fingerprint belongs to Trusted signer." --text="Before designating an individual trustworthy, you need to confirm that the signing key's fingerprint \(e.g. 0xE777299F...\) listed below their name matches what you had expected for this signers public key. Verify the fingerprint with several independent sources." --width=450 &
 	while read line; do
 		if (( ++i % 2 )); then
 			tput bold; echo -e "\n$line"; tput sgr0
@@ -587,6 +581,11 @@ $(tput setaf 4)Enter '$(tput bold)q$(tput sgr0)$(tput setaf 4)' after you've imp
 	#echo -e "\n\n\n"	# TODO see if these improve the view
 }
 
+passphrase_education() {
+	zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200
+	{ { tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ & sleep 140; totem --quit; } &>>log & totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>>log; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
+}
+
 #####################################
 ####### execution begins here #######
 printf '\033]2;Bitcoin Core on Tails setup\a'
@@ -595,23 +594,57 @@ set -m	# enables job control so downloads can be foregrounded if password creati
 test -f $HOME/.bitcoin/debug.log && cd $HOME/Persistent || { cd $HOME/Downloads; wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/ & dl=$!; }
 [ "$1" == '--download' ] && { download 2 ; exit 0 ; }
 # get current cloud compute spot prices from Google and BTC price if not yet downloaded or older than
-assumed_chain_state_size=$(wget --output-document - https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp | grep --max-count=1 m_assumed_chain_state_size | sed 's/[^0-9]*//g') & get_size=$!
 { test -f all-pricing_* && [ $(stat --format=%Y all-pricing) -gt $(date --date='30 days ago' +%s) ] || { until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com/compute/all-pricing; do sleep $((++k * (RANDOM%3+1) / 2)); done ; until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused $(grep --max-count=1 "<devsite-iframe>" all-pricing | cut -f2 -d'"'); do sleep $((++k * (RANDOM%3+1) / 2)); done ; }
 test -f btc-to-usd.htm && [ $(stat --format=%Y btc-to-usd.htm) -gt $(date --date='1 hour ago' +%s) ] || wget --timestamping https://www.unitconverters.net/currency/btc-to-usd.htm
 } & price=$!
+until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp; do sleep $((++k * (RANDOM%3+1) / 2)); done & get_size=$!
 echo '#!/bin/bash
 zenity --notification --text="Enter your administration password"
 zenity --password --title="Bitcoin Core on Tails"' > askpass
 export SUDO_ASKPASS=askpass
 chmod +x askpass
 sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo	# removes prompting for every sudo password every command, asks second time if file renamed
-[ "$1" != '--clone' ] && { zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200 & tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ ; } &>>log &
+[ "$1" != '--clone' ] && passphrase_education
 # TODO clones should reencrypt the data in case the temporary password was photographed, emailed or some other difficult to wipe media was used.  Refuse to create wallets until complete.
 [ "$1" == '--first-run' ] && { bitcoind &>/dev/null & benchmark 1 ; passphrase 0 ; new_wallet ; } || temp_pass=$(keepassxc-cli generate --exclude-similar --lower --numeric --length=24)
 mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked' || add_part $RUNNING_DEVICE $temp_pass '/live/persistence/TailsData_unlocked'
 sudo mv askpass /usr/local/bin
 sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache	# changes bitcoin: uri handling to bitcoin-qt
-test -f $HOME/.bitcoin/debug.log || { benchmark 1 ; passphrase 0; download 2 ; rsync -a --remove-source-files --exclude='*log' . "$mnt_pnt"/Persistent ; wait -f $get_size ; gnome-system-monitor --simple --show-resources-tab ; gtk-launch bitcoin-qt ; gnome-terminal --title='Running bitcoin' -- bash -c 'while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done'; sleep 2; clear -x; }	#new_wallet ; info_bd }	TODO later setup the wallet. TODO make into if statement TODO move "link" to proper location, config, shortcuts and script files must be preserved.
+#FIXME move ALL security critical instructions and scripts to read-only directories.
+if ! test -f $HOME/.bitcoin/debug.log; then
+	benchmark 1
+	passphrase 0
+	download 2
+	rsync -a --remove-source-files --exclude='*log' . "$mnt_pnt"/Persistent
+	rsync -a --remove-source-files "$BCOT_DIR" "$mnt_pnt"/Persistent
+	ps -p $get_size > /dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
+	assumed_chain_state_size=$(grep --max-count=1 m_assumed_chain_state_size chainparams.cpp | sed 's/[^0-9]*//g')
+	echo '[Desktop Entry]
+Type=Application
+Name=Bitcoin
+Exec=/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907))
+Terminal=false
+Hidden=false' | sudo tee autostart/bitcoin.desktop
+	echo '[Desktop Entry]
+Version=1.0
+Name=Bitcoin Core
+Comment=Connect to the Bitcoin P2P Network
+Comment[de]=Verbinde mit dem Bitcoin peer-to-peer Netzwerk
+Comment[fr]=Bitcoin, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=Bitcoin, eşten eşe kriptografik sanal para birimi
+Exec=/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907)) %u
+Terminal=false
+Type=Application
+Icon=/usr/local/share/pixmaps/bitcoin128.png
+MimeType=x-scheme-handler/bitcoin;
+Categories=Office;Finance;P2P;Network;Qt;
+StartupWMClass=Bitcoin-qt' | sudo tee local/share/applications/bitcoin-qt.desktop
+	gnome-system-monitor --simple --show-resources-tab
+	gtk-launch bitcoin-qt
+	gnome-terminal --title='Running bitcoin' -- bash -c 'while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done'
+	sleep 2
+	clear -x
+fi	#TODO add more info about initial block download after verification	TODO later setup the wallet. TODO make into if statement TODO move "link" to proper location, config, shortcuts and script files must be preserved. TODO 1.1 if user doesn't manually select the datadir within 60 seconds, restart with the defaults and display the text for when they get back.
 # TODO need to skip the above lines if the software is installed.
 # rsync -a $HOME/.gnupg "$mnt_pnt"/gnupg ; rsync -a /etc/NetworkManager/system-connections "$mnt_pnt"/nm-system-connections ;
 
@@ -640,6 +673,6 @@ fi
 # TODO we can use tails-backup-rsync or tails-backup for the backup case.
 sudo mv /etc/sudoers.d/always-ask-password{.bak,} &>>log &	# restores default sudo every command behavior TODO consider making this an exiting function
 
-# give this shutdown info to newly setup passphrases.
+# TODO give this shutdown info to newly setup passphrases.
 # https://tails.boum.org/doc/first_steps/shutdown/index.en.html
 
