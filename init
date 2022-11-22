@@ -125,16 +125,6 @@ q" | sudo parted $1		# labels it TailsData
 	ln --symbolic $HOME/debug.log $HOME/.bitcoin/debug.log	# moves debug log to amnesia so it doesn't persist restarts
 	ln --symbolic /media/$USER/ $HOME/.bitcoin/wallets	# links media mount directory to wallets folder for easier loading of watch encrypted or external media wallets
 	# autostart entry uses expected chainstate+4GiB as a buffer, it sets dbcache at available ram - 2000 this works out to ~default on 4GB and more on higher ram systems, haven't benchmarked to see if this is optimal, anywhere between 0 and chainstate size ram left available could be fastest depending on CPU and disk write performance relative to random read performance. 
-	echo '[Desktop Entry]
-Version=1.0
-Name=₿ails (Bitcoin Core on Tails)
-Comment=Clone, Backup or Wipe Bails and Configure Settings
-Exec=/usr/local/bin/bails_menu.sh
-Terminal=false
-Type=Application
-Icon=/usr/local/share/pixmaps/bails128.png
-Categories=Office;System;Finance;P2P;Network;Qt;
-StartupWMClass=bails' | sudo tee local/share/applications/bails.desktop
 	sudo chown --recursive Debian-gdm:Debian-gdm greeter-settings
 	sudo chown --recursive amnesia:amnesia Persistent gnupg
 	sudo chown tails-persistence-setup:tails-persistence-setup persistence.conf
@@ -626,7 +616,7 @@ if ! test -f $HOME/.bitcoin/debug.log; then
 	echo '[Desktop Entry]
 Type=Application
 Name=Bitcoin
-Exec=/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907))
+Exec=/bin/bash -c "/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907))"
 Terminal=false
 Hidden=false' | sudo tee /etc/xdg/autostart/bitcoin.desktop
 	echo '[Desktop Entry]
@@ -636,7 +626,7 @@ Comment=Connect to the Bitcoin P2P Network
 Comment[de]=Verbinde mit dem Bitcoin peer-to-peer Netzwerk
 Comment[fr]=Bitcoin, monnaie virtuelle cryptographique pair à pair
 Comment[tr]=Bitcoin, eşten eşe kriptografik sanal para birimi
-Exec=/usr/local/bin/bitcoin-qt -min -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907)) %u
+Exec=/bin/bash -c "/usr/local/bin/bitcoin-qt -chain=main -dbcache=$(($(grep Available /proc/meminfo | sed s/[^0-9]//g)/1024-2000)) -prune=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+'$assumed_chain_state_size')*1024 : 1907))" %u
 Terminal=false
 Type=Application
 Icon=/usr/local/share/pixmaps/bitcoin128.png
@@ -676,7 +666,7 @@ if [ "$1" == '--backup' ] || [ "$1" == '--clone' ]; then
 fi
 # TODO we can use tails-backup-rsync or tails-backup for the backup case.
 sudo mv /etc/sudoers.d/always-ask-password{.bak,} &>>log &	# restores default sudo every command behavior TODO consider making this an exiting function
-
+exit 0
 # TODO give this shutdown info to newly setup passphrases.
 # https://tails.boum.org/doc/first_steps/shutdown/index.en.html
 
