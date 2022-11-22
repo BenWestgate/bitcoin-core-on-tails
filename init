@@ -534,6 +534,7 @@ download () {
 		sleep 1
 	done
 	sudo --askpass tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/usr/local
+	cd -
 	{ sleep 5; zenity --title=README.md --text-info --filename=/usr/local/README.md --width=560 --height=580 --timeout=30; } & # displays the README.md for 30 seconds.
 }
 
@@ -575,9 +576,10 @@ Download Authenticity verified."$(tput sgr0)
 }
 
 get_key() {
+	sleep $((zzz*(16384+RANDOM)/32767))
 	echo -e "\n\n\n$(tput setaf 2)Enter '$(tput bold)1$(tput sgr0)$(tput setaf 2)' if you find this individual trustworthy$(tput sgr0), $(tput setaf 1)otherwise press $(tput bold)Enter$(tput sgr0),
 $(tput setaf 4)Enter '$(tput bold)q$(tput sgr0)$(tput setaf 4)' after you've imported a few trustworthy keys to check signatures.$(tput sgr0)"
-	gpg --search-keys $1 || return 1
+	gpg --search-keys $1 || { return 1; ((++zzz)); }	# TODO if users get banned from keyserver again introduce a fallback
 	#echo -e "\n\n\n"	# TODO see if these improve the view
 }
 
