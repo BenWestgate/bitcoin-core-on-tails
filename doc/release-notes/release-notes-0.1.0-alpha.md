@@ -5,7 +5,7 @@ Bitcoin Core on Tails version 0.1.0-alpha is now available from:
 
   <https://github.com/BenWestgate/Bitcoin-Core-on-Tails>
 
-This release includes only the setup script, clone, backup features not tested.
+This release includes only the setup script. Clone & backup features not tested.
 
 Please report bugs using the issue tracker at GitHub:
 

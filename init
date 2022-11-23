@@ -117,8 +117,8 @@ q" | sudo parted $1		# labels it TailsData
 		sudo rsync --archive $target/ $mnt_pnt/$source
 		sudo mount --bind $source $target
 	done <$temp_file
-	sudo cp -a $BCOT_DIR/{bin,share} local
-	sudo cp -a $BCOT_DIR/init local/bin/init	# copies this script into /usr/local/bin/
+	sudo rsync $BCOT_DIR/{bin,share} local
+	sudo rsync $BCOT_DIR/init local/bin/init	# copies this script into /usr/local/bin/
 	sudo mkdir -p Persistent/.bitcoin/{wallets,chainstate,blocks}
 	shred --remove $temp_file
 	# FIXME Add about to prune notice by looking at the newest blockXXXX.dat when a deletion diff was made to settings.json to alert user when these are expected to prune off.
@@ -630,7 +630,6 @@ Icon=/usr/local/share/pixmaps/bitcoin128.png
 MimeType=x-scheme-handler/bitcoin;
 Categories=Office;Finance;P2P;Network;Qt;
 StartupWMClass=Bitcoin-qt' | sudo tee /usr/local/share/applications/bitcoin-qt.desktop
-	gnome-system-monitor --simple --show-resources-tab &
 	gtk-launch bitcoin-qt
 	gnome-terminal --title='Running bitcoin' -- bash -c 'while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done'
 	sleep 2
