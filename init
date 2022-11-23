@@ -122,11 +122,12 @@ q" | sudo parted $1		# labels it TailsData
 	sudo mkdir -p Persistent/.bitcoin/wallets local/share/applications
 	shred --remove $temp_file
 	# FIXME Add about to prune notice by looking at the newest blockXXXX.dat when a deletion diff was made to settings.json to alert user when these are expected to prune off.
-	ln --symbolic $HOME/debug.log $HOME/.bitcoin/debug.log	# moves debug log to amnesia so it doesn't persist restarts
-	ln --symbolic /media/$USER/ $HOME/.bitcoin/wallets	# links media mount directory to wallets folder for easier loading of watch encrypted or external media wallets
+
 	# autostart entry uses expected chainstate+4GiB as a buffer, it sets dbcache at available ram - 2000 this works out to ~default on 4GB and more on higher ram systems, haven't benchmarked to see if this is optimal, anywhere between 0 and chainstate size ram left available could be fastest depending on CPU and disk write performance relative to random read performance. 
 	sudo chown --recursive Debian-gdm:Debian-gdm greeter-settings
 	sudo chown --recursive amnesia:amnesia Persistent gnupg
+	ln --symbolic $HOME/debug.log $HOME/.bitcoin/debug.log	# moves debug log to amnesia so it doesn't persist restarts
+	ln --symbolic /media/$USER/ $HOME/.bitcoin/wallets	# links media mount directory to wallets folder for easier loading of watch encrypted or external media wallets
 	sudo chown tails-persistence-setup:tails-persistence-setup persistence.conf
 	sudo chmod 0600 persistence.conf
 	sudo cp -a persistence.conf{,.bak}
