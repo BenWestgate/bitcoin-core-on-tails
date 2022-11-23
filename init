@@ -262,7 +262,7 @@ To Confirm Enter the $(tput setaf 1)Cost$(tput sgr0) Estimate from above: $(tput
 	if [ "$cost${bignum[i]} BTC" == "$cost_reply" ]; then
 		clear -x
 		printf '\033]2;Repeat new passphrase\a'
-		read -r-s -p "Verify Passphrase: " pass_reply
+		read -r -s -p "Verify Passphrase: " pass_reply
 		if [ "$pass_reply" == "$pass" ]; then
 			[ "$backup" ] || echo -e "$pass\n$pass" | sudo --askpass passwd amnesia 2>/dev/null	# changes the user password if not making backup 
 			echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
