@@ -119,7 +119,7 @@ q" | sudo parted $1		# labels it TailsData
 	done <$temp_file
 	sudo cp -a $BCOT_DIR/{bin,share} local
 	sudo cp -a $BCOT_DIR/init local/bin/init	# copies this script into /usr/local/bin/
-	sudo mkdir -p Persistent/.bitcoin/wallets local/share/applications
+	sudo mkdir -p Persistent/.bitcoin/{wallets,chainstate,blocks}
 	shred --remove $temp_file
 	# FIXME Add about to prune notice by looking at the newest blockXXXX.dat when a deletion diff was made to settings.json to alert user when these are expected to prune off.
 
@@ -608,7 +608,7 @@ if ! test -f $HOME/.bitcoin/debug.log; then
 	rsync -a --remove-source-files "$BCOT_DIR" "$mnt_pnt"/Persistent
 	ps -p $get_size > /dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
 	assumed_chain_state_size=$(grep --max-count=1 m_assumed_chain_state_size chainparams.cpp | sed 's/[^0-9]*//g')
-	rsync -a --remove-source-files --exclude='*log' . "$mnt_pnt"/Persistent
+	rsync -a --remove-source-files --exclude='*log*' . "$mnt_pnt"/Persistent
 	sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache	# changes bitcoin: uri handling to bitcoin-qt
 	echo '[Desktop Entry]
 Type=Application
