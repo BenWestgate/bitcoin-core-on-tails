@@ -411,11 +411,9 @@ tune_cost () {
 	# TOTAL_RAM / 2 , depends on system memory
 	# AVAILABLE , depends on system memory and usage
 	# TODO double check the minimum values preserve crack cost
-	zenity --info --text="$1\n$AVAILABLE\n$((TOTAL_RAM/2))"
 	max_memory_cost=$(echo "$1
 $AVAILABLE
 $((TOTAL_RAM/2))" | sort --numeric-sort | head -1)
-	zenity --info --text="max memory cost $max_memory_cost"
 	# adjust iteration times upward, if necessary, to compensate for less memory to keep total attack cost similar.
 	unset iter_value
 	for kBs in "$3" "$MIN_COST" "$MAX_COST"; do
@@ -439,11 +437,9 @@ $((TOTAL_RAM/2))" | sort --numeric-sort | head -1)
 	shred --remove $iter
 	get_guess_cost > /dev/null
 	ram_required=$(((TOTAL_RAM - AVAILABLE + memory_cost + 2**20 - 1)/2**20))	# minimum system requirement , since 2 GB is the Tails minimum Req we can warn if exceeding that.
-	zenity --info --text="$ram_required required\n$memory_cost mem cost"
 	(( ram_required <= $2 )) && return
 	zenity --title='Memory system requirement' --width=320 --question --text="Your encryption setting will require at least <b>$ram_required GB</b> of memory to open the encrypted Persistent Storage.\n\nYou may reduce the Memory required to be compatible on other PCs with less than $ram_required GB RAM. This may lengthen decryption time.\n\nOtherwise, click Continue." --cancel-label='Continue' --ok-label='Reduce RAM' --default-cancel || return && \
 	(( --ram_required > $2 )) && ram_required=$(zenity --scale --title='Reduce memory required' --text='Reduce the GB RAM Required to:' --value=$ram_required --min-value=$2 --max-value=$ram_required --step=1)
-	zenity --info --text="parameter 1: $((ram_required * 2**20 + AVAILABLE - TOTAL_RAM))\nparameter 2:$ram_required\n guess cost: $guess_cost"
 	[ "$ram_required" ] && tune_cost $((ram_required * 2**20 + AVAILABLE - TOTAL_RAM)) $ram_required $guess_cost
 }
 
