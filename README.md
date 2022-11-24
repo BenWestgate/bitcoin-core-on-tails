@@ -24,6 +24,22 @@ See Also:
 
 If you know someone you trust who uses Bitcoin Core on Tails already, you can install by cloning their Bitcoin Core on Tails skipping the initial block download.
 
+Open these instructions on another device
+
+![image](https://user-images.githubusercontent.com/73506583/203773811-b157925d-404f-4b91-bd86-6d2e6b454a59.png)
+
+In the next step, you will shut down the computer. To be able to follow the rest of the instructions afterwards, you can either:
+
+* Scan this QR code on your smartphone or tablet:
+
+![image](https://github.com/BenWestgate/bitcoin-core-on-tails/raw/master/mobile-qr.png)
+* Print these instructions on paper.
+
+* Take note of the URL of this page:
+```
+https://github.com/BenWestgate/bitcoin-core-on-tail/blob/master/README.md#how-to-use-this-script
+```
+
 1. [Install Tails](https://tails.boum.org/install/index.en.html) to a USB stick or Memory Card, minimum 16 GB capacity.
       * If you know someone you trust who uses Tails already, you can [install Tails by cloning](https://tails.boum.org/install/clone/index.en.html) their Tails.
 1. Start Tails and [set up an Administration Password](https://tails.boum.org/doc/first_steps/welcome_screen/administration_password/index.en.html) when the Welcome Screen appears.
