@@ -55,13 +55,12 @@ readonly TAILS_PART=$(mount | grep /lib/live/mount/medium | cut -f1 -d' ')
 readonly RUNNING_DEVICE=${TAILS_PART%?}
 readonly TOTAL_RAM=$(($(awk '/MemTotal/{print $2}' /proc/meminfo)))
 readonly AVAILABLE=$(($(awk '/MemAvailable/{print $2}' /proc/meminfo)))
-readonly DEFAULT_MAX_MEMORY=4194304	# compiled in LUKS2 default, can raise if increases in future.
-readonly LEAST_RAM_SUPPORTED=2	# tails system requirement in GB, raise it if Tails ever does
-timeout=10	# initial screen lock memory aid timeout in seconds, doubles each time
+readonly DEFAULT_MAX_MEMORY=4194304 # compiled in LUKS2 default, can raise if increases in future.
+readonly LEAST_RAM_SUPPORTED=2      # tails system requirement in GB, raise it if Tails ever does
+timeout=10                          # initial screen lock memory aid timeout in seconds, doubles each time
 mnt_pnt='/live/persistence/TailsData_unlocked'
 #cost=0
 #entropy=1000
-
 
 #################################################
 # Adds a second partition to device named TailsData to create a new persistent storage
@@ -70,7 +69,7 @@ mnt_pnt='/live/persistence/TailsData_unlocked'
 #	$2 = encrypted Persistent Storage Passphrase
 #	$3 = mount point for persistence filesystem.
 #################################################
-add_part () {		# TODO later this only runs no TailsData partition on selected device
+add_part() { # TODO later this only runs no TailsData partition on selected device
 	echo "n
 
 
@@ -78,19 +77,19 @@ add_part () {		# TODO later this only runs no TailsData partition on selected de
 t
 
 27
-w" | sudo fdisk $1		# creates linux reserved partition in free-space
+w" | sudo fdisk $1 # creates linux reserved partition in free-space
 	echo "name
 2
 TailsData
-q" | sudo parted $1		# labels it TailsData
+q" | sudo parted $1 # labels it TailsData
 	# Encrypt target TailsData partition, unlock, setup file system on mapped device, then mount.
 	echo -n "$2" | sudo cryptsetup luksFormat --pbkdf-memory=131072 --pbkdf-force-iterations=4 --batch-mode "$1"2
 	until echo -n "$2" | sudo cryptsetup open "$1"2 TailsData_unlocked$i; do ((i++)); done
 	sudo mkfs.ext4 -F -L 'TailsData' /dev/mapper/TailsData_unlocked$i
 	sleep 0.1
 	# mounts TailsData at parameter 3 , increments if already exists
-	until sudo mkdir -p "$3"$j; do ((j++)); done		#FIXME if $i gets reused elsewhere.
-	sudo mount -o noatime,nodiratime /dev/mapper/TailsData_unlocked$i "$3"$j	#FIXME until mount succeeds mkdir && mount
+	until sudo mkdir -p "$3"$j; do ((j++)); done                             #FIXME if $i gets reused elsewhere.
+	sudo mount -o noatime,nodiratime /dev/mapper/TailsData_unlocked$i "$3"$j #FIXME until mount succeeds mkdir && mount
 	mnt_pnt="$3$j"
 	device="$1"2
 	cd "$3$j"
@@ -109,7 +108,7 @@ q" | sudo parted $1		# labels it TailsData
 /usr/local	source=local
 /etc/xdg/autostart	source=autostart" | sudo tee persistence.conf
 	temp_file=$(mktemp)
-	sudo cat persistence.conf > $temp_file
+	sudo cat persistence.conf >$temp_file
 	while read -r line; do
 		target=$(echo $line | cut -f1 -d' ')
 		source=$(echo $line | cut -f2 -d=)
@@ -118,16 +117,16 @@ q" | sudo parted $1		# labels it TailsData
 		sudo mount --bind $source $target
 	done <$temp_file
 	sudo cp "$BCOT_DIR"/{bin,share} local
-	sudo cp "$BCOT_DIR"/init local/bin/init	# copies this script into /usr/local/bin/
+	sudo cp "$BCOT_DIR"/init local/bin/init # copies this script into /usr/local/bin/
 	sudo mkdir -p Persistent/.bitcoin/{wallets,chainstate,blocks}
 	shred --remove $temp_file
 	# FIXME Add about to prune notice by looking at the newest blockXXXX.dat when a deletion diff was made to settings.json to alert user when these are expected to prune off.
 
-	# autostart entry uses expected chainstate+4GiB as a buffer, it sets dbcache at available ram - 2000 this works out to ~default on 4GB and more on higher ram systems, haven't benchmarked to see if this is optimal, anywhere between 0 and chainstate size ram left available could be fastest depending on CPU and disk write performance relative to random read performance. 
+	# autostart entry uses expected chainstate+4GiB as a buffer, it sets dbcache at available ram - 2000 this works out to ~default on 4GB and more on higher ram systems, haven't benchmarked to see if this is optimal, anywhere between 0 and chainstate size ram left available could be fastest depending on CPU and disk write performance relative to random read performance.
 	sudo chown --recursive Debian-gdm:Debian-gdm greeter-settings
 	sudo chown --recursive amnesia:amnesia Persistent gnupg
-	ln --symbolic $HOME/debug.log $HOME/.bitcoin/debug.log	# moves debug log to amnesia so it doesn't persist restarts
-	ln --symbolic /media/$USER/ $HOME/.bitcoin/wallets	# links media mount directory to wallets folder for easier loading of watch encrypted or external media wallets
+	ln --symbolic $HOME/debug.log $HOME/.bitcoin/debug.log # moves debug log to amnesia so it doesn't persist restarts
+	ln --symbolic /media/$USER/ $HOME/.bitcoin/wallets     # links media mount directory to wallets folder for easier loading of watch encrypted or external media wallets
 	sudo chown tails-persistence-setup:tails-persistence-setup persistence.conf
 	sudo chmod 0600 persistence.conf
 	sudo cp -a persistence.conf{,.bak}
@@ -137,34 +136,48 @@ bPrune=true
 fUseProxy=true
 nDisplayUnit=3
 strDataDir=/home/amnesia/.bitcoin
-strThirdPartyTxUrls=explorerzydxu5ecjrkwceayqybizmpjjznk5izmitf2modhcusuqlid.onion/tx/%s" > Persistent/.config/Bitcoin/Bitcoin-Qt.conf
+strThirdPartyTxUrls=explorerzydxu5ecjrkwceayqybizmpjjznk5izmitf2modhcusuqlid.onion/tx/%s" >Persistent/.config/Bitcoin/Bitcoin-Qt.conf
 	cd -
 }
-
 
 #################################################
 # Benchmarks Argon2 performance to later estimate GB second cost per passphrase attempt
 # Parameters $1 = multiplier for lengthening default decryption time for backup USBs from 2s to 20s
 #################################################
-benchmark () {
+benchmark() {
 	test_img="$(mktemp)"
 	fallocate -l 20MiB "$test_img"
 	pass=$RANDOM
 	echo $pass | sudo cryptsetup luksFormat --pbkdf-memory=65536 --pbkdf-force-iterations=4 --batch-mode "$test_img"
 	# time in seconds to reach 64MiB of RAM used for Argon2
-	elapsed_64="$( TIMEFORMAT='%E';time ( echo $pass | sudo cryptsetup open "$test_img" --test-passphrase ) 2>&1 1>/dev/null)"
+	elapsed_64="$(
+		TIMEFORMAT='%E'
+		time (echo $pass | sudo cryptsetup open "$test_img" --test-passphrase) 2>&1 1>/dev/null
+	)"
 	echo $pass | sudo cryptsetup luksConvertKey --pbkdf-memory=524288 --pbkdf-force-iterations=4 --batch-mode "$test_img"
 	# time in seconds to reach 512MiB of RAM used for Argon2
-	elapsed_512="$( TIMEFORMAT='%E';time ( echo $pass | sudo cryptsetup open "$test_img" --test-passphrase ) 2>&1 1>/dev/null)"
-	fillrate=$(echo "458752 / ($elapsed_512 - $elapsed_64)" | bc -l)	# Argon2 memory fill rate in kB/s
-	iter_time=$(echo "2^20 /$fillrate * 1000" | bc -l)	# time in ms to fill 1 GiB
-	fillrate=${fillrate%.*}	# convert to integer
-	iter_time=${iter_time%.*}	# converts to integer
-	readonly DEFAULT_ITER=$(( iter_time < 2000 ? 2000 * $1 : iter_time * $1))	# default iteration time
+	elapsed_512="$(
+		TIMEFORMAT='%E'
+		time (echo $pass | sudo cryptsetup open "$test_img" --test-passphrase) 2>&1 1>/dev/null
+	)"
+	fillrate=$(echo "458752 / ($elapsed_512 - $elapsed_64)" | bc -l)         # Argon2 memory fill rate in kB/s
+	iter_time=$(echo "2^20 /$fillrate * 1000" | bc -l)                       # time in ms to fill 1 GiB
+	fillrate=${fillrate%.*}                                                  # convert to integer
+	iter_time=${iter_time%.*}                                                # converts to integer
+	readonly DEFAULT_ITER=$((iter_time < 2000 ? 2000 * $1 : iter_time * $1)) # default iteration time
 	max_memory_cost=$DEFAULT_MAX_MEMORY
-	DEFAULT_COST=$(iter_time=$((DEFAULT_ITER/1000)); get_guess_cost)
-	MIN_COST=$(iter_time=$((DEFAULT_ITER/10000)); get_guess_cost)
-	MAX_COST=$(iter_time=$((DEFAULT_ITER/100)); get_guess_cost)
+	DEFAULT_COST=$(
+		iter_time=$((DEFAULT_ITER / 1000))
+		get_guess_cost
+	)
+	MIN_COST=$(
+		iter_time=$((DEFAULT_ITER / 10000))
+		get_guess_cost
+	)
+	MAX_COST=$(
+		iter_time=$((DEFAULT_ITER / 100))
+		get_guess_cost
+	)
 	shred --remove "$test_img"
 }
 
@@ -177,7 +190,7 @@ benchmark () {
 # Outputs:
 #		guess_cost in kB*s on standard out
 #######################################
-get_guess_cost () {
+get_guess_cost() {
 	memory_cost=$((iter_time * fillrate < max_memory_cost ? iter_time * fillrate : max_memory_cost))
 	guess_cost=$((iter_time * memory_cost))
 	echo $guess_cost
@@ -192,7 +205,7 @@ get_guess_cost () {
 #		Sets user account password to it
 #		Sets full disk encryption password to it
 #################################################
-passphrase () {
+passphrase() {
 	printf '\033]2;Choose Screen Lock and Full Disk Encryption passphrase\a'
 	clear -x
 	echo -e "Choose Screen Lock and Full Disk Encryption Passphrase
@@ -218,7 +231,7 @@ $(tput bold)NOTES ON PASSPHRASES$(tput sgr0)
        When suddenly out of the blue,  your brain refuses to cooperate, having
        any two of your paper backups can restore your seed to spend your funds.
 "
-	if (( $1 > 0 )); then
+	if (($1 > 0)); then
 		dice_pass="$(keepassxc-cli diceware --words=$1)"
 		echo "Generated a$dice_type random diceware passphrase:$(tput bold)
        $dice_pass$(tput sgr0)
@@ -227,33 +240,38 @@ $(tput bold)NOTES ON PASSPHRASES$(tput sgr0)
 		echo -n "Press $(tput bold)Enter$(tput sgr0) to be given a random passphrase or "
 	fi
 	read -r -s -p "Enter your proposed passphrase: " pass
-	((++attempt))	# if user repeatly trys different passwords until finding one they "like" use this to reduce the entropy estimate accordingly
-	clear -x	#TODO remove -x
+	((++attempt)) # if user repeatly trys different passwords until finding one they "like" use this to reduce the entropy estimate accordingly
+	clear -x      #TODO remove -x
 	if [ "$pass" == "" ]; then
-		passphrase 3	# using 3 words as a default suggestion, 4 may be better for L2+.
+		passphrase 3 # using 3 words as a default suggestion, 4 may be better for L2+.
 		return 0
 	fi
 	#estimate entropy and removes spaces from diceware passphrases to prevent overestimation
 	entropy=$(keepassxc-cli estimate "${pass// /}" | cut -f2 | tr -C -d '[:digit:]')
-	[ "$pass" == "$temp_pass" ] && { entropy=1 ; zenity --title='Passphrase reuse' --warning --text='It is insecure to reuse the temporary password.\nPlease select a new passphrase that only you know.' --timeout=10 ; }
+	[ "$pass" == "$temp_pass" ] && {
+		entropy=1
+		zenity --title='Passphrase reuse' --warning --text='It is insecure to reuse the temporary password.\nPlease select a new passphrase that only you know.' --timeout=10
+	}
 	if [ "$pass" != "$dice_pass" ]; then
 		len=${#pass}
-		cb=''; wb=''; lb=''
-		if (( len < 10 )); then lb=$(tput bold); else lb=''; fi
-		wc=$(keepassxc-cli estimate --advanced "$pass" | grep --count Dict)	# counts words
-		if (( entropy < 36800 && wc < 3 )); then
+		cb=''
+		wb=''
+		lb=''
+		if ((len < 10)); then lb=$(tput bold); else lb=''; fi
+		wc=$(keepassxc-cli estimate --advanced "$pass" | grep --count Dict) # counts words
+		if ((entropy < 36800 && wc < 3)); then
 			cb=$(tput bold)
-		elif (( wc < 8 )); then 
+		elif ((wc < 8)); then
 			wb=$(tput bold)
 		fi
 	else
 		printf '\033]2;Memorize the passphrase\a'
-		mem_words "$dice_pass"	# helps memorize new diceware
+		mem_words "$dice_pass" # helps memorize new diceware
 	fi
-	ps -p $price > /dev/null && fg %$(jobs -l | grep $price | cut -f1 -d' ' | tr -c -d '[:digit:]')
+	ps -p $price >/dev/null && fg %$(jobs -l | grep $price | cut -f1 -d' ' | tr -c -d '[:digit:]')
 	# find compute cost per GB memory hour, memory is the primary cost of Argon2id brute force attacks
 	GB_HOUR_COST=$(grep --text "GB hour" all-pricing_* | cut -f2 -d$ | sort | head -1 | cut -f1 -d' ')
-	BTCUSD=$(grep -o -P '(?<=1 Bitcoin = ).*(?= United States Dollar<br>)' btc-to-usd.htm )
+	BTCUSD=$(grep -o -P '(?<=1 Bitcoin = ).*(?= United States Dollar<br>)' btc-to-usd.htm)
 	# resets max RAM, iter-time and minimum system RAM supported
 	tune_cost $DEFAULT_MAX_MEMORY $LEAST_RAM_SUPPORTED $DEFAULT_COST
 	read -e -p "Press Enter to try a stronger passphrase
@@ -266,11 +284,15 @@ To Confirm Enter the $(tput setaf 1)Cost$(tput sgr0) Estimate from above: $(tput
 		if [ "$pass_reply" == "$pass" ]; then
 			echo -e "$pass\n$pass" | sudo --askpass passwd amnesia 2>/dev/null
 			echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
-TAILS_PASSWORD_HASH_FUNCTION=SHA512" | sudo tee "$mnt_pnt"/greeter-settings/tails.password > /dev/null	# persists this as admin password for future logins to the chosen device.
-			sudo chown -R Debian-gdm:Debian-gdm "$mnt_pnt"/greeter-settings	#TODO remove if works w/o
+TAILS_PASSWORD_HASH_FUNCTION=SHA512" | sudo tee "$mnt_pnt"/greeter-settings/tails.password >/dev/null # persists this as admin password for future logins to the chosen device.
+			sudo chown -R Debian-gdm:Debian-gdm "$mnt_pnt"/greeter-settings                                    #TODO remove if works w/o
 			sudo chmod 0600 "$mnt_pnt"/greeter-settings/tails.password
 			# spaced repetition memory trainer
-			while ((1)); do sleep $timeout; tails-screen-locker &>/dev/null; (( timeout*=2 )); done &
+			while ((1)); do
+				sleep $timeout
+				tails-screen-locker &>/dev/null
+				((timeout *= 2))
+			done &
 			printf '\033]2;Changing Persistent Storage passphrase\a'
 			change_key $temp_pass
 			printf '\033]2;Tips for the new passphrase\a'
@@ -319,25 +341,25 @@ Bitcoin data will be stored in an encrypted form protected by your passphrase."
 			return 0
 		else
 			echo "The supplied passphrases did not match."
-			dice_words=$(( ( entropy - 7336 ) / 15000 ))	# generates a shorter diceware passphrase
+			dice_words=$(((entropy - 7336) / 15000)) # generates a shorter diceware passphrase
 			sleep 1.5
 			dice_type=" more memorable"
 		fi
 	else
-		dice_words=$(( ( entropy + 19380 ) / 12920 ))	# generates a stronger one
+		dice_words=$(((entropy + 19380) / 12920)) # generates a stronger one
 		dice_type=" stronger"
 	fi
 	passphrase $dice_words
 }
 
 #######################################
-#	Arguments:  $1 = optional temporary password , will prompt if not provided 
+#	Arguments:  $1 = optional temporary password , will prompt if not provided
 #######################################
-change_key () {
+change_key() {
 	[ "$1" ] || temp_pass=$(zenity --password --title='Enter temporary encrypted Persistent Storage password')
 	echo "$temp_pass
 $pass
-" | sudo cryptsetup luksChangeKey --batch-mode --pbkdf-memory=$max_memory_cost --iter-time=$((iter_time*1000)) $device || change_key "$1"
+" | sudo cryptsetup luksChangeKey --batch-mode --pbkdf-memory=$max_memory_cost --iter-time=$((iter_time * 1000)) $device || change_key "$1"
 }
 
 #######################################
@@ -345,36 +367,38 @@ $pass
 # Arguments:
 # 	$1 = diceware words
 #######################################
-mem_words () {
-	local pass=( $1 )
-	local memorized=( $1 )
+mem_words() {
+	local pass=($1)
+	local memorized=($1)
 	local unconfirmed=
 	local delete=
 	while true; do
 		clear
-		local mem_aid=( ${pass[*]} )
+		local mem_aid=(${pass[*]})
 		for word in ${memorized[*]}; do
-			mem_aid=($(sed "s/$word/$(seq -s"_" ${#word}|tr -d '[:digit:]')_/g" <<< ${mem_aid[*]}))
+			mem_aid=($(sed "s/$word/$(seq -s"_" ${#word} | tr -d '[:digit:]')_/g" <<<${mem_aid[*]}))
 		done
 		echo "Enter what words you remember of your passphrase below their blanks:
 
 ${mem_aid[*]}"
-		read -n${#1} -e -a  ARRAY
-		for (( i=0 ; i <= ${#pass[*]} ; i++ )); do
+		read -n${#1} -e -a ARRAY
+		for ((i = 0; i <= ${#pass[*]}; i++)); do
 			if [ ${pass[i]} != ${mem_aid[i]} ]; then
 				if [ "${ARRAY[i]}" != "${pass[i]}" ]; then
 					delete=${pass[i]}
-					memorized=( ${memorized[@]/$delete} )
-					unconfirmed+=( $delete )
+					memorized=(${memorized[@]/$delete/})
+					unconfirmed+=($delete)
 				else
 					delete=${pass[i]}
-					unconfirmed=( ${unconfirmed[@]/$delete} )
+					unconfirmed=(${unconfirmed[@]/$delete/})
 				fi
 			fi
 		done
 		memorized+=(${unconfirmed[0]})
-		if [ "${unconfirmed[0]}" == "" ]; then 
-			clear; 	unset ARRAY delete unconfirmed memorized pass; break
+		if [ "${unconfirmed[0]}" == "" ]; then
+			clear
+			unset ARRAY delete unconfirmed memorized pass
+			break
 		fi
 		clear
 		echo "Remember this word: "${unconfirmed[0]}
@@ -404,9 +428,9 @@ When you have come up with one,
 #	$1 = target max memory cost in kiB
 #	$2 = lowest target system RAM in GiB
 #	$3 = initial attack cost for slider in kB * s
-#		
+#
 #######################################
-tune_cost () {
+tune_cost() {
 	# Maximum memory for password hashing is the lowest of:
 	# max memory use target , default is 4 GiB but can reduce to improve compatibility
 	# TOTAL_RAM / 2 , depends on system memory
@@ -414,34 +438,34 @@ tune_cost () {
 	# TODO double check the minimum values preserve crack cost
 	max_memory_cost=$(echo "$1
 $AVAILABLE
-$((TOTAL_RAM/2))" | sort --numeric-sort | head -1)
+$((TOTAL_RAM / 2))" | sort --numeric-sort | head -1)
 	# adjust iteration times upward, if necessary, to compensate for less memory to keep total attack cost similar.
 	unset iter_value
 	for kBs in "$3" "$MIN_COST" "$MAX_COST"; do
-		unsaturated=$(echo "sqrt($kBs / $fillrate)" | bc )
+		unsaturated=$(echo "sqrt($kBs / $fillrate)" | bc)
 		saturated=$((kBs / max_memory_cost))
-		iter_value+=( $((saturated > unsaturated ? saturated : unsaturated )) )
+		iter_value+=($((saturated > unsaturated ? saturated : unsaturated)))
 	done
 
 	iter_time=${iter_value[0]}
 	crack_estimate
 	iter=$(mktemp)
-	step=$(((iter_value[2] - iter_value[1])/19))
-	(( iter_value[1] )) || iter_value[1]=1
-	echo -n $iter_time > $iter
+	step=$(((iter_value[2] - iter_value[1]) / 19))
+	((iter_value[1])) || iter_value[1]=1
+	echo -n $iter_time >$iter
 	printf '\033]2;Passphrase cracking cost\a'
 	while read iter_time; do
 		crack_estimate
-		echo -n $iter_time > $iter
+		echo -n $iter_time >$iter
 	done < <(zenity --scale --title='Encryption settings' --text='Specify decryption time.\n\nHigher values offer more protection, but each Tails start-up will be this much longer.\nTerminal shows impact on cracking cost.\n\nDecryption Time (seconds):' --value=$iter_time --min-value=${iter_value[1]} --step=$step --max-value=${iter_value[2]} --print-partial)
 	iter_time=$(<$iter)
 	shred --remove $iter
-	get_guess_cost > /dev/null
-	ram_required=$(((TOTAL_RAM - AVAILABLE + memory_cost + 2**20 - 1)/2**20))	# minimum system requirement , since 2 GB is the Tails minimum Req we can warn if exceeding that.
-	(( ram_required <= $2 )) && return
-	zenity --title='Memory system requirement' --width=320 --question --text="Your encryption setting will require at least <b>$ram_required GB</b> of memory to open the encrypted Persistent Storage.\n\nYou may reduce the Memory required to be compatible on other PCs with less than $ram_required GB RAM. This may lengthen decryption time.\n\nOtherwise, click Continue." --cancel-label='Continue' --ok-label='Reduce RAM' --default-cancel || return && \
-	(( --ram_required > $2 )) && ram_required=$(zenity --scale --title='Reduce memory required' --text='Reduce the GB RAM Required to:' --value=$ram_required --min-value=$2 --max-value=$ram_required --step=1)
-	[ "$ram_required" ] && tune_cost $((ram_required * 2**20 + AVAILABLE - TOTAL_RAM)) $ram_required $guess_cost
+	get_guess_cost >/dev/null
+	ram_required=$(((TOTAL_RAM - AVAILABLE + memory_cost + 2 ** 20 - 1) / 2 ** 20)) # minimum system requirement , since 2 GB is the Tails minimum Req we can warn if exceeding that.
+	((ram_required <= $2)) && return
+	zenity --title='Memory system requirement' --width=320 --question --text="Your encryption setting will require at least <b>$ram_required GB</b> of memory to open the encrypted Persistent Storage.\n\nYou may reduce the Memory required to be compatible on other PCs with less than $ram_required GB RAM. This may lengthen decryption time.\n\nOtherwise, click Continue." --cancel-label='Continue' --ok-label='Reduce RAM' --default-cancel || return &&
+		((--ram_required > $2)) && ram_required=$(zenity --scale --title='Reduce memory required' --text='Reduce the GB RAM Required to:' --value=$ram_required --min-value=$2 --max-value=$ram_required --step=1)
+	[ "$ram_required" ] && tune_cost $((ram_required * 2 ** 20 + AVAILABLE - TOTAL_RAM)) $ram_required $guess_cost
 }
 
 #######################################
@@ -449,32 +473,32 @@ $((TOTAL_RAM/2))" | sort --numeric-sort | head -1)
 # Outputs:
 #		Estimate on stdout
 #######################################
-crack_estimate () {
+crack_estimate() {
 	clear -x
-	get_guess_cost &>> log
+	get_guess_cost &>>log
 	echo "Tails recommends choosing a long passphrase made of five to seven random words.
 Bitcoin Core recommends using a passphrase of$lb 10 or more$(tput sgr0)$cb random characters$(tput sgr0), or
 ${wb}eight or more words$(tput sgr0).
 "
 	cost=$(echo "scale=8; e( $entropy/1000 * l(2) - l($attempt) )*$guess_cost*$GB_HOUR_COST/2/3600000/1048576/$BTCUSD +0.00000001" | bc -l)
-	bignum=( "" "" " million" " billion" " trillion" " quadrillion" " quintillion" " sextillion" " septillion" " septillion" " octillion" " nonillion" " decillion" " undecillion" " duodecillion" " tredecillion" " quattuordecillion" " quindecillion" " sexcillion" " septendecillion" " 	octodecillion" " novemdecillion" " vigintillion" )
+	bignum=("" "" " million" " billion" " trillion" " quadrillion" " quintillion" " sextillion" " septillion" " septillion" " octillion" " nonillion" " decillion" " undecillion" " duodecillion" " tredecillion" " quattuordecillion" " quindecillion" " sexcillion" " septendecillion" " 	octodecillion" " novemdecillion" " vigintillion")
 	i=0
-	if (( ${#cost} == 9 )); then
+	if ((${#cost} == 9)); then
 		cost=0${cost}
-	elif (( ${#cost} == 10 )); then
+	elif ((${#cost} == 10)); then
 		true
-	elif (( ${#cost} == 11 )); then
-		cost=${cost:: -4}
-	elif (( ${#cost} == 12 )); then
-		cost=${cost:: -7}
+	elif ((${#cost} == 11)); then
+		cost=${cost::-4}
+	elif ((${#cost} == 12)); then
+		cost=${cost::-7}
 	else
 		cost=${cost%.*}
-		if (( ${#cost} > 6 )); then
-			while (( ${#cost} > 5 )); do
-				cost=$(bc <<< "scale=1; $cost/1000")
-				(( i++ ))
+		if ((${#cost} > 6)); then
+			while ((${#cost} > 5)); do
+				cost=$(bc <<<"scale=1; $cost/1000")
+				((i++))
 			done
-			if (( ${cost%.*} >=10 && i > 1 )); then cost=${cost%.*}; fi	
+			if ((${cost%.*} >= 10 && i > 1)); then cost=${cost%.*}; fi
 		fi
 	fi
 	cost=$(numfmt --grouping $cost)
@@ -499,21 +523,26 @@ Recommendation:
 #   Arguments:	$1 = Good signatures needed to verify
 #		Installs Bitcoin to /live/persistence/TailsData_unlocked/local.
 #######################################
-download () {
+download() {
 	printf '\033]2;Downloading Bitcoin Core signatures...\a'
 	wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
 	cd "$(ls -dt bitcoin-core* | head -1)"
 	# get builder-keys and delete shitcoiners
 	wget --continue https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/builder-keys/keys.txt
-	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" keys.txt > keys
+	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" keys.txt >keys
 	verify $1 # finds 2 trustworthy attestations from keys.txt for the download checksum
 	cd -
 	printf '\033]2;Downloading Bitcoin Core...\a'
 	# brings the started in background download to foreground so user can see progress.
-	ps -p $dl > /dev/null && fg %$(jobs -l | grep $dl | cut -f1 -d' ' | tr -c -d '[:digit:]') || wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
-	rm -R download *.tmp
+	ps -p $dl >/dev/null && fg %$(jobs -l | grep $dl | cut -f1 -d' ' | tr -c -d '[:digit:]') || wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
+	rm -R download ./*.tmp
 	cd "$(ls -dt bitcoin-core* | head -1)"
-	sha256sum --ignore-missing --check SHA256SUMS || { echo "Download Integrity Failure: Checksum does not match what was expected." ; rm --verbose *.tar.*; sleep 5 ; exit 1 ; }
+	sha256sum --ignore-missing --check SHA256SUMS || {
+		echo "Download Integrity Failure: Checksum does not match what was expected."
+		rm --verbose ./*.tar.*
+		sleep 5
+		exit 1
+	}
 	test -f $HOME/.bitcoin/bitcoind.pid && kill "$(<$HOME/.bitcoin/bitcoind.pid)"
 	while test -f $HOME/.bitcoin/bitcoind.pid; do
 		kill $(<$HOME/.bitcoin/bitcoind.pid)
@@ -522,7 +551,10 @@ download () {
 	done
 	sudo --askpass tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/usr/local
 	cd -
-	{ sleep 5; zenity --title=README.md --text-info --filename=/usr/local/README.md --width=560 --height=580 --timeout=30; } & # displays the README.md for 30 seconds.
+	{
+		sleep 5
+		zenity --title=README.md --text-info --filename=/usr/local/README.md --width=560 --height=580 --timeout=30
+	} & # displays the README.md for 30 seconds.
 }
 
 #######################################
@@ -530,24 +562,31 @@ download () {
 #   Arguments:	$1 = Good signatures needed to verify
 #		$2 = not first run?
 #######################################
-verify () {
+verify() {
 	printf '\033]2;Verify Bitcoin Core download signatures\a'
 	[ "$2" ] || zenity --info --title="Confirm fingerprint belongs to Trusted signer." --text="Before designating an individual trustworthy, you need to confirm that the signing key's fingerprint \(e.g. 0xE777299F...\) listed below their name matches what you had expected for this signers public key. Verify the fingerprint with several independent sources." --width=450 &
 	while read line; do
-		if (( ++i % 2 )); then
-			tput bold; echo -e "\n$line"; tput sgr0
+		if ((++i % 2)); then
+			tput bold
+			echo -e "\n$line"
+			tput sgr0
 		else
-			echo $line; line=${line//[[:blank:]]/}	# strips spaces out of pgp fingerprint
-			grep --with-filename ${line:22} *keys* || { tput setaf 1; echo "WARNING:$(tput sgr0) fingerprint ${line:22} not in keys.txt!"; ((i-=2)); }
+			echo $line
+			line=${line//[[:blank:]]/} # strips spaces out of pgp fingerprint
+			grep --with-filename ${line:22} ./*keys* || {
+				tput setaf 1
+				echo "WARNING:$(tput sgr0) fingerprint ${line:22} not in keys.txt!"
+				((i -= 2))
+			}
 		fi
 	done < <(gpg --verify SHA256SUMS.asc SHA256SUMS 2>&1 | grep 'gpg: Good signature\|Primary key fingerprint: ')
-	if (( i/2 >= $1 )); then
+	if ((i / 2 >= $1)); then
 		echo $(tput bold)"
 Download Authenticity verified."$(tput sgr0)
 		sleep 2.5
 	else
 		if [ "$2" == "1" ]; then
-			echo -e "\n\n\nNot enough Good signatures, $((i/2)) found, $1 required, $(tput bold)import more keys$(tput sgr0)."
+			echo -e "\n\n\nNot enough Good signatures, $((i / 2)) found, $1 required, $(tput bold)import more keys$(tput sgr0)."
 			sleep 1.5
 		else
 			clear -x
@@ -563,16 +602,26 @@ Download Authenticity verified."$(tput sgr0)
 }
 
 get_key() {
-	sleep $((zzz*(16384+RANDOM)/32767))
+	sleep $((zzz * (16384 + RANDOM) / 32767))
 	echo -e "\n\n\n$(tput setaf 2)Enter '$(tput bold)1$(tput sgr0)$(tput setaf 2)' if you find this individual trustworthy$(tput sgr0), $(tput setaf 1)otherwise press $(tput bold)Enter$(tput sgr0),
 $(tput setaf 4)Enter '$(tput bold)q$(tput sgr0)$(tput setaf 4)' after you've imported a few trustworthy keys to check signatures.$(tput sgr0)"
-	gpg --search-keys $1 || { ((++zzz)); return 1; }	# TODO if users get banned from keyserver again introduce a fallback
+	gpg --search-keys $1 || {
+		((++zzz))
+		return 1
+	} # TODO if users get banned from keyserver again introduce a fallback
 	#echo -e "\n\n\n"	# TODO see if these improve the view
 }
 
 passphrase_education() {
 	zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200
-	{ { tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ & sleep 140; totem --quit; } &>>log & totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>>log; } # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
+	{
+		{
+			tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ &
+			sleep 140
+			totem --quit
+		} &>>log &
+		totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>>log
+	} # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
 }
 
 #TODO put all my wait to retry download code in a unified function w/ local variables. for clarity.
@@ -580,24 +629,47 @@ passphrase_education() {
 #####################################
 ####### execution begins here #######
 printf '\033]2;Bitcoin Core on Tails setup\a'
-[ "$1" ] || [ $(lsblk --raw $RUNNING_DEVICE | grep part | wc --lines) -gt 1 ] && { zenity --notification --text="Running Device ($RUNNING_DEVICE) already partitioned."; gnome-disks $RUNNING_DEVICE & sleep 2; exit 1; }
-set -m	# enables job control so downloads can be foregrounded if password creation finishes first
-test -f $HOME/.bitcoin/debug.log && cd $HOME/Persistent || { cd $HOME/Downloads; wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/ & dl=$!; }
-[ "$1" == '--download' ] && { download 2 ; exit 0 ; }
+[ "$1" ] || [ $(lsblk --raw $RUNNING_DEVICE | grep -c part) -gt 1 ] && {
+	zenity --notification --text="Running Device ($RUNNING_DEVICE) already partitioned."
+	gnome-disks $RUNNING_DEVICE &
+	sleep 2
+	exit 1
+}
+set -m # enables job control so downloads can be foregrounded if password creation finishes first
+test -f $HOME/.bitcoin/debug.log && cd $HOME/Persistent || {
+	cd $HOME/Downloads
+	wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/ &
+	dl=$!
+}
+[ "$1" == '--download' ] && {
+	download 2
+	exit 0
+}
 # get current cloud compute spot prices from Google and BTC price if not yet downloaded or older than
-{ test -f all-pricing_* && [ $(stat --format=%Y all-pricing) -gt $(date --date='30 days ago' +%s) ] || { until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com/compute/all-pricing; do sleep $((++k * (RANDOM%3+1) / 2)); done ; until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused $(grep --max-count=1 "<devsite-iframe>" all-pricing | cut -f2 -d'"'); do sleep $((++k * (RANDOM%3+1) / 2)); done ; }
-test -f btc-to-usd.htm && [ $(stat --format=%Y btc-to-usd.htm) -gt $(date --date='1 hour ago' +%s) ] || wget --timestamping https://www.unitconverters.net/currency/btc-to-usd.htm
-} & price=$!
-until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp; do sleep $((++k * (RANDOM%3+1) / 2)); done & get_size=$!
+{
+	test -f all-pricing_* && [ $(stat --format=%Y all-pricing) -gt $(date --date='30 days ago' +%s) ] || {
+		until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://cloud.google.com/compute/all-pricing; do sleep $((++k * (RANDOM % 3 + 1) / 2)); done
+		until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused $(grep --max-count=1 "<devsite-iframe>" all-pricing | cut -f2 -d'"'); do sleep $((++k * (RANDOM % 3 + 1) / 2)); done
+	}
+	test -f btc-to-usd.htm && [ $(stat --format=%Y btc-to-usd.htm) -gt $(date --date='1 hour ago' +%s) ] || wget --timestamping https://www.unitconverters.net/currency/btc-to-usd.htm
+} &
+price=$!
+until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp; do sleep $((++k * (RANDOM % 3 + 1) / 2)); done &
+get_size=$!
 echo '#!/bin/bash
 zenity --notification --text="Enter your administration password"
-zenity --password --title="Bitcoin Core on Tails"' > askpass
+zenity --password --title="Bitcoin Core on Tails"' >askpass
 export SUDO_ASKPASS=askpass
 chmod +x askpass
-sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo	# removes prompting for every sudo password every command, asks second time if file renamed
+sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo # removes prompting for every sudo password every command, asks second time if file renamed
 [ "$1" != '--clone' ] && passphrase_education
 # TODO clones should reencrypt the data in case the temporary password was photographed, emailed or some other difficult to wipe media was used.  Refuse to create wallets until complete.
-[ "$1" == '--first-run' ] && { bitcoind &>/dev/null & benchmark 1 ; passphrase 0 ; new_wallet ; } || temp_pass=$(keepassxc-cli generate --exclude-similar --lower --numeric --length=24)
+[ "$1" == '--first-run' ] && {
+	bitcoind &>/dev/null &
+	benchmark 1
+	passphrase 0
+	new_wallet
+} || temp_pass=$(keepassxc-cli generate --exclude-similar --lower --numeric --length=24)
 mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked' || add_part $RUNNING_DEVICE $temp_pass '/live/persistence/TailsData_unlocked'
 sudo mv askpass /usr/local/bin
 #FIXME move ALL security critical instructions and scripts to read-only directories.
@@ -606,10 +678,10 @@ if ! test -f $HOME/.bitcoin/debug.log; then
 	passphrase 0
 	download 2
 	rsync -a --remove-source-files "$BCOT_DIR" "$mnt_pnt"/Persistent
-	ps -p $get_size > /dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
+	ps -p $get_size >/dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
 	assumed_chain_state_size=$(grep --max-count=1 m_assumed_chain_state_size chainparams.cpp | sed 's/[^0-9]*//g')
 	rsync -a --remove-source-files --exclude='*log*' . "$mnt_pnt"/Persistent
-	sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache	# changes bitcoin: uri handling to bitcoin-qt
+	sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache # changes bitcoin: uri handling to bitcoin-qt
 	echo '[Desktop Entry]
 Type=Application
 Name=Bitcoin
@@ -631,10 +703,10 @@ MimeType=x-scheme-handler/bitcoin;
 Categories=Office;Finance;P2P;Network;Qt;
 StartupWMClass=Bitcoin-qt' | sudo tee /usr/local/share/applications/bitcoin-qt.desktop
 	gtk-launch bitcoin-qt
-	gnome-terminal --title='Running bitcoin' -- bash -c 'while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done'
+	gnome-terminal --title='Running bitcoin' -- bash -c "while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done"
 	sleep 2
 	clear -x
-fi	#TODO add more info about initial block download after verification	TODO later setup the wallet. TODO make into if statement TODO move "link" to proper location, config, shortcuts and script files must be preserved. TODO 1.1 if user doesn't manually select the datadir within 60 seconds, restart with the defaults and display the text for when they get back.
+fi #TODO add more info about initial block download after verification	TODO later setup the wallet. TODO make into if statement TODO move "link" to proper location, config, shortcuts and script files must be preserved. TODO 1.1 if user doesn't manually select the datadir within 60 seconds, restart with the defaults and display the text for when they get back.
 # TODO need to skip the above lines if the software is installed.
 # rsync -a $HOME/.gnupg "$mnt_pnt"/gnupg ; rsync -a /etc/NetworkManager/system-connections "$mnt_pnt"/nm-system-connections ;
 
@@ -642,27 +714,27 @@ fi	#TODO add more info about initial block download after verification	TODO late
 
 if [ "$1" == '--backup' ] || [ "$1" == '--clone' ]; then
 	# stores device that was cloned to.
-	device=$(tails-installer --verbose 2>&1 | grep 'INFO: Resetting Master Boot Record of' | awk '{print $NF}')	#TODO make sure this captures device for updates/upgrades as well as blank USBs.
-	[ "$device" ] || exit 1	# quit if no device was flashed
-	dev_name="$(lsblk --path --nodeps --noheading --output=SIZE,VENDOR,MODEL,LABEL "$device")"	# Use this to remind user which device is safe to eject after backup or cloning.
-	add_part $device $temp_pass /media/amnesia/TailsData	# new persistent file system will be mounted at $mnt_pnt
+	device=$(tails-installer --verbose 2>&1 | grep 'INFO: Resetting Master Boot Record of' | awk '{print $NF}') #TODO make sure this captures device for updates/upgrades as well as blank USBs.
+	[ "$device" ] || exit 1                                                                                     # quit if no device was flashed
+	dev_name="$(lsblk --path --nodeps --noheading --output=SIZE,VENDOR,MODEL,LABEL "$device")"                  # Use this to remind user which device is safe to eject after backup or cloning.
+	add_part $device $temp_pass /media/amnesia/TailsData                                                        # new persistent file system will be mounted at $mnt_pnt
 	if [ "$1" == '--backup' ]; then
-		rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt" & backup=$!
+		rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt" &
+		backup=$!
 		benchmark 10
 		passphrase 0
-		ps -p $backup > /dev/null && fg %$(jobs -l | grep $backup | cut -f1 -d' ' | tr -c -d '[:digit:]')	# returns copy operation to foreground for progress monitoring.
+		ps -p $backup >/dev/null && fg %$(jobs -l | grep $backup | cut -f1 -d' ' | tr -c -d '[:digit:]') # returns copy operation to foreground for progress monitoring.
 		udisksctl power-off --block-device $device
 		zenity --title='Backup complete!' --info --text="'$dev_name' device ($device) can now be safely removed from the computer.\n\nNote: Always verify the backup works before storing it in a safe place."
 	else
 		zenity --info --title='Temporary password' --text="Your new Tails persistent storage has been encrypted with the temporary password:\n\n<big><big><big><big><b>${temp_pass::4}</b></big>${temp_pass:4:4}<big><b>${temp_pass:8:4}</b></big>${temp_pass:12:4}<big><b>${temp_pass:16:4}</b></big>${temp_pass:20}</big></big></big>\n\nPlease write this down or use it to log-in to the new clone. You will be asked to create a new passphrase on first log-in." --width=400 &
-		rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt"	#FIXME this needs to be changed to copy just bitcoin/{blocks,indexes,chainstate}, dotfiles (which includes this script), and installed software packages
+		rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt" #FIXME this needs to be changed to copy just bitcoin/{blocks,indexes,chainstate}, dotfiles (which includes this script), and installed software packages
 		udisksctl power-off --block-device $device
 		zenity --title='Cloning complete!' --info --text="'$dev_name' device ($device) can now be safely removed from the computer.\n\nNote: Always keep this device physically secure. If an attacker modifies it while left unattended and you use it, you could lose privacy or funds."
 	fi
 fi
 # TODO we can use tails-backup-rsync or tails-backup for the backup case.
-sudo mv /etc/sudoers.d/always-ask-password{.bak,} &>>log &	# restores default sudo every command behavior TODO consider making this an exiting function
+sudo mv /etc/sudoers.d/always-ask-password{.bak,} &>>log & # restores default sudo every command behavior TODO consider making this an exiting function
 exit 0
 # TODO give this shutdown info to newly setup passphrases.
 # https://tails.boum.org/doc/first_steps/shutdown/index.en.html
-
