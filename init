@@ -50,7 +50,7 @@
 # TODO tell users this is how they will log-in:  file:///usr/share/doc/tails/website/doc/first_steps/persistence.en.html#use
 
 #################################################
-readonly BCOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+readonly BCOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly TAILS_PART=$(mount | grep /lib/live/mount/medium | cut -f1 -d' ')
 readonly RUNNING_DEVICE=${TAILS_PART%?}
 readonly TOTAL_RAM=$(($(awk '/MemTotal/{print $2}' /proc/meminfo)))
@@ -117,8 +117,8 @@ q" | sudo parted $1		# labels it TailsData
 		sudo rsync --archive $target/ $mnt_pnt/$source
 		sudo mount --bind $source $target
 	done <$temp_file
-	sudo rsync "$BCOT_DIR"/{bin,share} local
-	sudo rsync "$BCOT_DIR"/init local/bin/init	# copies this script into /usr/local/bin/
+	sudo cp "$BCOT_DIR"/{bin,share} local
+	sudo cp "$BCOT_DIR"/init local/bin/init	# copies this script into /usr/local/bin/
 	sudo mkdir -p Persistent/.bitcoin/{wallets,chainstate,blocks}
 	shred --remove $temp_file
 	# FIXME Add about to prune notice by looking at the newest blockXXXX.dat when a deletion diff was made to settings.json to alert user when these are expected to prune off.
@@ -264,10 +264,10 @@ To Confirm Enter the $(tput setaf 1)Cost$(tput sgr0) Estimate from above: $(tput
 		printf '\033]2;Repeat new passphrase\a'
 		read -r -s -p "Verify Passphrase: " pass_reply
 		if [ "$pass_reply" == "$pass" ]; then
-			[ "$backup" ] || echo -e "$pass\n$pass" | sudo --askpass passwd amnesia 2>/dev/null	# changes the user password if not making backup 
+			echo -e "$pass\n$pass" | sudo --askpass passwd amnesia 2>/dev/null
 			echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
 TAILS_PASSWORD_HASH_FUNCTION=SHA512" | sudo tee "$mnt_pnt"/greeter-settings/tails.password > /dev/null	# persists this as admin password for future logins to the chosen device.
-			sudo chown -R Debian-gdm:Debian-gdm "$mnt_pnt"/greeter-settings	#TODO remove it works w/o
+			sudo chown -R Debian-gdm:Debian-gdm "$mnt_pnt"/greeter-settings	#TODO remove if works w/o
 			sudo chmod 0600 "$mnt_pnt"/greeter-settings/tails.password
 			# spaced repetition memory trainer
 			while ((1)); do sleep $timeout; tails-screen-locker &>/dev/null; (( timeout*=2 )); done &
@@ -433,7 +433,7 @@ $((TOTAL_RAM/2))" | sort --numeric-sort | head -1)
 	while read iter_time; do
 		crack_estimate
 		echo -n $iter_time > $iter
-	done < <(zenity --scale --title='Encryption settings' --text='Specify how much key stretching is done.\n\nHigher values offer more protection, but each Tails start-up will be this much longer.\nTerminal shows impact on cracking cost.\n\nDecryption Time (seconds):' --value=$iter_time --min-value=${iter_value[1]} --step=$step --max-value=${iter_value[2]} --print-partial)
+	done < <(zenity --scale --title='Encryption settings' --text='Specify decryption time.\n\nHigher values offer more protection, but each Tails start-up will be this much longer.\nTerminal shows impact on cracking cost.\n\nDecryption Time (seconds):' --value=$iter_time --min-value=${iter_value[1]} --step=$step --max-value=${iter_value[2]} --print-partial)
 	iter_time=$(<$iter)
 	shred --remove $iter
 	get_guess_cost > /dev/null
@@ -461,6 +461,8 @@ ${wb}eight or more words$(tput sgr0).
 	i=0
 	if (( ${#cost} == 9 )); then
 		cost=0${cost}
+	elif (( ${#cost} == 10 )); then
+		true
 	elif (( ${#cost} == 11 )); then
 		cost=${cost:: -4}
 	elif (( ${#cost} == 12 )); then
