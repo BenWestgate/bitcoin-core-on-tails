@@ -116,15 +116,17 @@ q" | sudo parted $1 # labels it TailsData
 		sudo rsync --archive $target/ $mnt_pnt/$source
 		sudo mount --bind $source $target
 	done <$temp_file
-	sudo cp "$BCOT_DIR"/{bin,share} local
-	sudo cp "$BCOT_DIR"/init local/bin/init # copies this script into /usr/local/bin/
-	sudo mkdir -p Persistent/.bitcoin/{wallets,chainstate,blocks}
 	shred --remove $temp_file
+	sudo cp --archive "$BCOT_DIR"/init /usr/local/bin # installs this script
+	sudo cp --archive --recursive "$BCOT_DIR"/{bin,share} /usr/local
+
+
 	# FIXME Add about to prune notice by looking at the newest blockXXXX.dat when a deletion diff was made to settings.json to alert user when these are expected to prune off.
 
 	# autostart entry uses expected chainstate+4GiB as a buffer, it sets dbcache at available ram - 2000 this works out to ~default on 4GB and more on higher ram systems, haven't benchmarked to see if this is optimal, anywhere between 0 and chainstate size ram left available could be fastest depending on CPU and disk write performance relative to random read performance.
 	sudo chown --recursive Debian-gdm:Debian-gdm greeter-settings
 	sudo chown --recursive amnesia:amnesia Persistent gnupg
+	mkdir -p $HOME/.bitcoin/{wallets,chainstate,blocks}
 	ln --symbolic $HOME/debug.log $HOME/.bitcoin/debug.log # moves debug log to amnesia so it doesn't persist restarts
 	ln --symbolic /media/$USER/ $HOME/.bitcoin/wallets     # links media mount directory to wallets folder for easier loading of watch encrypted or external media wallets
 	sudo chown tails-persistence-setup:tails-persistence-setup persistence.conf
@@ -613,7 +615,7 @@ $(tput setaf 4)Enter '$(tput bold)q$(tput sgr0)$(tput setaf 4)' after you've imp
 }
 
 passphrase_education() {
-	zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200
+	zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200 &
 	{
 		{
 			tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ &
@@ -662,7 +664,7 @@ zenity --password --title="Bitcoin Core on Tails"' >askpass
 export SUDO_ASKPASS=askpass
 chmod +x askpass
 sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo # removes prompting for every sudo password every command, asks second time if file renamed
-[ "$1" != '--clone' ] && passphrase_education
+[ "$1" != '--clone' ] && passphrase_education &
 # TODO clones should reencrypt the data in case the temporary password was photographed, emailed or some other difficult to wipe media was used.  Refuse to create wallets until complete.
 [ "$1" == '--first-run' ] && {
 	bitcoind &>/dev/null &
