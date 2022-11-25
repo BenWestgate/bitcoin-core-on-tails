@@ -284,13 +284,14 @@ To Confirm Enter the $(tput setaf 1)Cost$(tput sgr0) Estimate from above: $(tput
 		printf '\033]2;Repeat new passphrase\a'
 		read -r -s -p "Verify Passphrase: " pass_reply
 		if [ "$pass_reply" == "$pass" ]; then
+			export SUDO_ASKPASS=askpass
 			echo -e "$pass\n$pass" | sudo --askpass passwd amnesia 2>/dev/null
 			echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
 TAILS_PASSWORD_HASH_FUNCTION=SHA512" | sudo tee "$mnt_pnt"/greeter-settings/tails.password >/dev/null # persists this as admin password for future logins to the chosen device.
 			sudo chown -R Debian-gdm:Debian-gdm "$mnt_pnt"/greeter-settings                                    #TODO remove if works w/o
 			sudo chmod 0600 "$mnt_pnt"/greeter-settings/tails.password
 			# spaced repetition memory trainer
-			while ((1)); do
+			while true; do
 				sleep $timeout
 				tails-screen-locker &>/dev/null
 				((timeout *= 2))
@@ -535,7 +536,7 @@ download() {
 	verify $1 # finds 2 trustworthy attestations from keys.txt for the download checksum
 	cd -
 	printf '\033]2;Downloading Bitcoin Core...\a'
-	prune_MiB=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+$assumed_chain_state_size)*1024 : 1908))
+	prune_MiB=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ( $(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1) ) / 1024 - ( 4 + assumed_chain_state_size ) * 1024 : 1908 ))
 	prune_GB=$(( (prune_MiB+1)*2**20/10**9))
 	backup_days=$((prune_MiB/309))
 	{ until [ "$docs" == 'Continue' ]; do docs=$(zenity --question --title='Setup almost complete' --icon-name=bails128 --window-icon=/usr/local/share/pixmaps/bails128.png --text='Bitcoin Core will finish downloading, install and begin syncing the block chain automatically. You will not have much to do for the next several hours or days. Keep an eye on your PC so no one messes with it.\n\nIt is safer to exit Bitcoin Core (<b>Ctrl+Q</b>) and <a href="file:///usr/share/doc/tails/website/doc/first_steps/shutdown/index.en.html">shutdown Tails</a> and take the USB stick with you or store in a safe place than leave Tails running unattended where people you distrust could tamper with it.\n\nIf you want to learn more about Tails read the documentation. Another excellent use of time would be browsing "security in-a-box" website to improve your physical and digital security.' --extra-button='Documentation' --extra-button='Security Tools & Tactics' --extra-button='Continue' --switch --width=552);
