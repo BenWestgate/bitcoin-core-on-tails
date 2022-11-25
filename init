@@ -627,11 +627,11 @@ passphrase_education() {
 	zenity --info --title='Welcome to Bitcoin Core on Tails' --text="Let's Learn about password tactics while we set things up." --timeout=5 --width=200 &
 	{
 		{
-			tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/ &
 			sleep 140
 			totem --quit
-		} &>>log &
-		totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4 &>>log
+		} &
+		totem --fullscreen "$BCOT_DIR"/How_To_Make_A_Super-Secure_Password-Oc6NiSrlvVc.mp4
+		tor-browser http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/passwords/passwords-and-2fa/
 	} # FIXME if baremetal testing makes fullscreen seem excessive just, launch --window video backgrounded and forget about killing it.
 }
 
@@ -673,7 +673,7 @@ zenity --password --title="Bitcoin Core on Tails"' >askpass
 export SUDO_ASKPASS=askpass
 chmod +x askpass
 sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo # removes prompting for every sudo password every command, asks second time if file renamed
-[ "$1" != '--clone' ] && passphrase_education &
+[ "$1" != '--clone' ] && passphrase_education &>>log &
 # TODO clones should reencrypt the data in case the temporary password was photographed, emailed or some other difficult to wipe media was used.  Refuse to create wallets until complete.
 [ "$1" == '--first-run' ] && {
 	bitcoind &>/dev/null &
@@ -714,9 +714,6 @@ MimeType=x-scheme-handler/bitcoin;
 Categories=Office;Finance;P2P;Network;Qt;
 StartupWMClass=Bitcoin-qt' | sudo tee /usr/local/share/applications/bitcoin-qt.desktop
 	gtk-launch bitcoin-qt
-	sleep 10
-	gnome-terminal --title='Running bitcoin' -- bash -c "while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done"
-	sleep 2
 	clear -x
 fi #TODO add more info about initial block download after verification	TODO later setup the wallet. TODO make into if statement TODO move "link" to proper location, config, shortcuts and script files must be preserved. TODO 1.1 if user doesn't manually select the datadir within 60 seconds, restart with the defaults and display the text for when they get back.
 # TODO need to skip the above lines if the software is installed.
