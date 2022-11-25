@@ -535,8 +535,17 @@ download() {
 	verify $1 # finds 2 trustworthy attestations from keys.txt for the download checksum
 	cd -
 	printf '\033]2;Downloading Bitcoin Core...\a'
+	prune_MiB=$((($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1)) - 10485760 > 1953125 ? ($(df --output=avail $HOME/.bitcoin | tail -1) + $(du --summarize $HOME/.bitcoin/blocks | cut -f1))/1024 - (4+$assumed_chain_state_size)*1024 : 1908))
+	prune_GB=$(( (prune_MiB+1)*2**20/10**9))
+	backup_days=$((prune_MiB/309))
+	{ until [ "$docs" == 'Continue' ]; do docs=$(zenity --question --title='Setup almost complete' --icon-name=bails128 --window-icon=/usr/local/share/pixmaps/bails128.png --text='Bitcoin Core will finish downloading, install and begin syncing the block chain automatically. You will not have much to do for the next several hours or days. Keep an eye on your PC so no one messes with it.\n\nIt is safer to exit Bitcoin Core (<b>Ctrl+Q</b>) and <a href="file:///usr/share/doc/tails/website/doc/first_steps/shutdown/index.en.html">shutdown Tails</a> and take the USB stick with you or store in a safe place than leave Tails running unattended where people you distrust could tamper with it.\n\nIf you want to learn more about Tails read the documentation. Another excellent use of time would be browsing "security in-a-box" website to improve your physical and digital security.' --extra-button='Documentation' --extra-button='Security Tools & Tactics' --extra-button='Continue' --switch --width=552);
+	[ "$docs" == 'Documentation' ] && xdg-open file:///usr/share/doc/tails/website/doc.en.html &
+	[ "$docs" == 'Security Tools & Tactics' ] && xdg-open http://lxjacvxrozjlxd7pqced7dyefnbityrwqjosuuaqponlg3v7esifrzad.onion/en/ & done &
+	zenity --title='Bitcoin Core info' --icon-name=bails128 --window-icon=/usr/local/share/pixmaps/bitcoin128.png --info --text="<b>Setup</b>
+---------------------
+Bitcoin Core is the original Bitcoin client and it builds the backbone of the network. It will download and process the entire history of Bitcoin transactions, which currently is a few hundred gigabytes.\n\nDepending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.\n\nThis initial synchronisation is very demanding, and may expose hardware problems with your computer that had previously gone unnoticed. Each time you run Bitcoin Core, it will continue downloading where it left off.\n\nLimiting block chain storage to $(( (prune+1)*2**20/10**9)) GB (<b>sufficient to restore backups $backup_days days old</b>)" --width=552; } &>/dev/null & 
 	# brings the started in background download to foreground so user can see progress.
-	ps -p $dl >/dev/null && fg %$(jobs -l | grep $dl | cut -f1 -d' ' | tr -c -d '[:digit:]') || wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz,SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
+	ps -p $dl >/dev/null && fg %$(jobs -l | grep $dl | cut -f1 -d' ' | tr -c -d '[:digit:]') || wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
 	rm -R download ./*.tmp
 	cd "$(ls -dt bitcoin-core* | head -1)"
 	sha256sum --ignore-missing --check SHA256SUMS || {
@@ -555,7 +564,7 @@ download() {
 	cd -
 	{
 		sleep 5
-		zenity --title=README.md --text-info --filename=/usr/local/README.md --width=560 --height=580 --timeout=30
+		zenity --title=README.md --text-info --filename=/usr/local/README.md --width=560 --height=580
 	} & # displays the README.md for 30 seconds.
 }
 
@@ -679,10 +688,10 @@ if ! test -f $HOME/.bitcoin/debug.log; then
 	benchmark 1
 	passphrase 0
 	download 2
-	rsync -a --remove-source-files "$BCOT_DIR" "$mnt_pnt"/Persistent
+	rsync -a --remove-source-files "$BCOT_DIR" $HOME/Persistent
 	ps -p $get_size >/dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
 	assumed_chain_state_size=$(grep --max-count=1 m_assumed_chain_state_size chainparams.cpp | sed 's/[^0-9]*//g')
-	rsync -a --remove-source-files --exclude='*log*' . "$mnt_pnt"/Persistent
+	rsync -a --remove-source-files --exclude='*log*' . $HOME/Persistent
 	sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache # changes bitcoin: uri handling to bitcoin-qt
 	echo '[Desktop Entry]
 Type=Application
@@ -705,6 +714,7 @@ MimeType=x-scheme-handler/bitcoin;
 Categories=Office;Finance;P2P;Network;Qt;
 StartupWMClass=Bitcoin-qt' | sudo tee /usr/local/share/applications/bitcoin-qt.desktop
 	gtk-launch bitcoin-qt
+	sleep 10
 	gnome-terminal --title='Running bitcoin' -- bash -c "while test -f $HOME/.bitcoin/bitcoin.pid; do tail $HOME/.bitcoin/debug.log; sleep 5; done"
 	sleep 2
 	clear -x
@@ -738,5 +748,3 @@ fi
 # TODO we can use tails-backup-rsync or tails-backup for the backup case.
 sudo mv /etc/sudoers.d/always-ask-password{.bak,} &>>log & # restores default sudo every command behavior TODO consider making this an exiting function
 exit 0
-# TODO give this shutdown info to newly setup passphrases.
-# https://tails.boum.org/doc/first_steps/shutdown/index.en.html
