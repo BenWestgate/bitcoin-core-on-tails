@@ -109,7 +109,6 @@ setup_persist_fs() {
 /home/amnesia/.config/Bitcoin	source=Persistent/.config/Bitcoin
 /usr/local	source=local
 /etc/xdg/autostart	source=autostart" | sudo tee --append persistence.conf
-	zenity --info --text='check the persistence.conf'
 #	sudo awk '!a[$0]++' persistence.conf | sudo tee persistence.conf	# removes duplicate entries
 	temp_file=$(mktemp)
 	sudo cat persistence.conf >$temp_file
@@ -704,7 +703,6 @@ else
 fi
 if mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked'; then
 	until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp; do sleep $((++k * (RANDOM % 3 + 1) / 2)); done & get_size=$!
-	zenity --info --text "about to setup $mnt_pnt"
 	setup_persist_fs
 	if $new_pw; then
 		echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
