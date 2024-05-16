@@ -109,7 +109,7 @@ setup_persist_fs() {
 /home/amnesia/.config/Bitcoin	source=Persistent/.config/Bitcoin
 /usr/local	source=local
 /etc/xdg/autostart	source=autostart" | sudo tee --append persistence.conf
-#	sudo awk '!a[$0]++' persistence.conf | sudo tee persistence.conf	# removes duplicate entries
+	sudo awk '!a[$0]++' persistence.conf | sudo tee persistence.conf	# removes duplicate entries
 	temp_file=$(mktemp)
 	sudo cat persistence.conf >$temp_file
 	while read -r line; do
@@ -299,9 +299,8 @@ To Confirm Enter the $(tput setaf 1)Cost$(tput sgr0) Estimate from above: $(tput
 	passphrase $dice_words
 }
 password_success() {
-	sudo --askpass passwd amnesia <<< "$pass
+	sudo passwd amnesia <<< "$pass
 $pass" &>>log
-	sudo mv /usr/local/bin/askpass{.bak,}	# restores the original askpass.
 	# spaced repetition memory trainer
 	while true; do
 		sleep $timeout
@@ -531,8 +530,8 @@ download() {
 	wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
 	cd "$(ls -dt bitcoin-core* | head -1)"
 	# get builder-keys and delete shitcoiners
-	wget --continue https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/verify-commits/trusted-keys
-	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" trusted-keys >keys
+	wget --continue https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/builder-keys/keys.txt
+	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" keys.txt >keys
 	gpg --refresh-keys	# refresh keys in keyring to see if any were revoked
 	verify $1 # finds 2 trustworthy attestations from keys.txt for the download checksum
 	cd -
@@ -548,6 +547,7 @@ download() {
 Bitcoin Core is the original Bitcoin client and it builds the backbone of the network. It will download and process the entire history of Bitcoin transactions, currently a few hundred gigabytes.\n\nDepending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.\n\nThis initial synchronisation is very demanding, and may expose hardware problems with your computer that had previously gone unnoticed. Each time you run Bitcoin Core, it will continue downloading where it left off.\n\nLimiting block chain storage to $prune_GB GB (<b>sufficient to restore backups $backup_days days old</b>)" --width=552; } &>/dev/null &
 	# brings the started in background download to foreground so user can see progress.
 	ps -p $dl >/dev/null && fg %$(jobs -l | grep $dl | cut -f1 -d' ' | tr -c -d '[:digit:]') || wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
+	rm -R download ./*.tmp
 	cd "$(ls -dt bitcoin-core* | head -1)"
 	sha256sum --ignore-missing --check SHA256SUMS || {
 		echo "Download Integrity Failure: Checksum does not match what was expected."
@@ -561,7 +561,7 @@ Bitcoin Core is the original Bitcoin client and it builds the backbone of the ne
 		pkill bitcoin*
 		sleep 1
 	done
-	sudo --askpass tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/usr/local
+	sudo tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/usr/local
 	cd -
 	{
 		sleep 5
@@ -659,29 +659,17 @@ test -f /usr/local/bin/bitcoin-qt && cd $HOME/Persistent || {
 }
 echo '#!/bin/bash
 zenity --notification --text="Enter your administration password"
-zenity --password --title="Bitcoin Core on Tails"' >askpass.bak
-
-
-# removes prompting for every sudo password every command -- only prompts once if correct.
-until sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log; do
-	admin_pw=$(bash askpass.bak)
-	echo '#!/bin/bash
-printf '$admin_pw > askpass
-	chmod +x askpass
-done
-sudo --askpass mv askpass /usr/local/bin/askpass
-sudo --askpass mv askpass.bak /usr/local/bin/askpass.bak
+zenity --password --title="Bitcoin Core on Tails"' >askpass
+chmod +x askpass
+sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo # removes prompting for every sudo password every command, asks second time if file renamed
+sudo mv askpass /usr/local/bin/askpass
 sudo chmod +x /usr/local/bin/askpass
-export SUDO_ASKPASS=/usr/local/bin/askpass
-zenity --question --title='Self-Custody warning' --text='With bitcoin, you are your own bank. No one else has access to your private keys.\n\nDo you understand?' || exit 1
-zenity --question --title='Self-Custody warning' --text='If you lose access to this USB stick and the backup we will help you create, your bitcoin cannot be recovered.\n\nDo you understand?'
-zenity --question --title='Back up your wallet to cloud storage' --text='Regularly saves an encrypted copy of your wallet to your cloud account. Allows for easy recovery in case you lose acces to this device.' --cancel-label='Do this later' --OK-label='Online Accounts'
-# I think using deja-dup + mounting the cloud accounts will work well enough. or one of the 
 [ "$1" == '--download' ] && {
 	download 2
 	gtk-launch bitcoin-qt
 	exit 0
 	}
+	# FIXME can just use test -e or test -d
 mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked' && [ ! "$1" ] || [ "$1" == '--clone' ] || passphrase_education &>>log &
 if [ "$1" == '--first-run' ]; then
 	bitcoind &>/dev/null &
@@ -716,19 +704,20 @@ else
 fi
 if mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked'; then
 	until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp; do sleep $((++k * (RANDOM % 3 + 1) / 2)); done & get_size=$!
-	setup_persist_fs
-	if $new_pw; then
-		echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
+	[ "$1" ] || { setup_persist_fs;
+		if $new_pw; then
+			echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
 TAILS_PASSWORD_HASH_FUNCTION=SHA512" | sudo tee "$mnt_pnt"/greeter-settings/tails.password >/dev/null # persists this as admin password for future logins to the chosen device.
-		sudo chown -R Debian-gdm:Debian-gdm "$mnt_pnt"/greeter-settings	#TODO remove if works w/o
-		sudo chmod 0600 "$mnt_pnt"/greeter-settings/tails.password
-	fi
-	download 2
+			sudo chown -R Debian-gdm:Debian-gdm "$mnt_pnt"/greeter-settings	#TODO remove if works w/o
+			sudo chmod 0600 "$mnt_pnt"/greeter-settings/tails.password
+		fi
+		download 2
+	}
 	ps -p $get_size >/dev/null && fg %$(jobs -l | grep $get_size | cut -f1 -d' ' | tr -c -d '[:digit:]')
 	assumed_chain_state_size=$(grep --max-count=1 m_assumed_chain_state_size chainparams.cpp | sed 's/[^0-9]*//g')
-	rsync -a --remove-source-files --exclude='*log*' . $HOME/Persistent/
-	rsync -a --remove-source-files "$BCOT_DIR" $HOME/Persistent/
-	sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache # changes bitcoin: uri handling to bitcoin-qt
+	[ "$1" ] || { rsync -a --remove-source-files --exclude='*log*' . $HOME/Persistent/;
+		rsync -a --remove-source-files "$BCOT_DIR" $HOME/Persistent/
+		sudo sed 's/electrum/bitcoin-qt/g' /usr/share/applications/mimeinfo.cache | sudo tee /usr/local/share/applications/mimeinfo.cache ; } # changes bitcoin: uri handling to bitcoin-qt
 	# autostart entry uses expected chainstate+4GiB as a prune buffer, it sets dbcache at available ram - 2000 this works out to ~default on 4GB and more on higher ram systems, haven't benchmarked to see if this is optimal, leaving anywhere between no and chainstate size available ram could be fastest depending on CPU and disk write performance relative to random read performance. Larger dbcache wears the flash memory out less.
 	echo '[Desktop Entry]
 Type=Application
@@ -750,7 +739,7 @@ Icon=/usr/local/share/pixmaps/bitcoin128.png
 MimeType=x-scheme-handler/bitcoin;
 Categories=Office;Finance;P2P;Network;Qt;
 StartupWMClass=Bitcoin-qt' | sudo tee /usr/local/share/applications/bitcoin-qt.desktop
-	gtk-launch bitcoin-qt
+	[ "$1" ] || gtk-launch bitcoin-qt
 	clear -x
 fi
 
@@ -768,25 +757,25 @@ if [ "$1" == '--backup' ] || [ "$1" == '--clone' ]; then
 	device=$(tails-installer --verbose 2>&1 | grep 'INFO: Resetting Master Boot Record of' | awk '{print $NF}')
 	[ "$device" ] || exit 1                                                                                     # quit if no device was flashed
 	dev_name="$(lsblk --path --nodeps --noheading --output=SIZE,VENDOR,MODEL,LABEL "$device")"                  # Use this to remind user which device is safe to eject after backup or cloning.
-	if [ $(lsblk --raw $device | grep -c part) -eq 1 ]; then
+	if [ $(lsblk --raw $RUNNING_DEVICE | grep -c part) -eq 1 ]; then
 		add_part $device $temp_pass /media/amnesia/TailsData	# new persistent file system will be mounted at $mnt_pnt
 	elif [ "$(echo 'i
 
-q' | sudo fdisk $device | grep 'Name' | sed 's/Name: //g')" == TailsData ];
+q' | sudo fdisk $device | grep 'Name' | sed 's/Name: //g')" == TailsData ]; then
 		until udisksctl mount --block-device ${device}2; do
 			sleep 1
 		done
-		unset $temp_pass	# if user decrypts an existing partition there is no temp_pass
+		unset temp_pass	# if user decrypts an existing partition there is no temp_pass
 	else
 		mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked' || {
 		zenity --notification --text="Running Device ($RUNNING_DEVICE) already partitioned."
-		gnome-disks $RUNNING_DEVICE &
-		sleep 2
-		exit 1
+			gnome-disks $RUNNING_DEVICE &
+			sleep 2
+			exit 1
 		}
 	fi
 	if [ "$1" == '--backup' ]; then
-		rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt" &
+		sudo rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt" &
 		backup=$!
 		benchmark 10
 		passphrase 0
@@ -797,7 +786,7 @@ q' | sudo fdisk $device | grep 'Name' | sed 's/Name: //g')" == TailsData ];
 		zenity --title='Backup complete!' --info --text="'$dev_name' device ($device) can now be safely removed from the computer.\n\nNote: Always verify the backup works before storing it in a safe place."
 	else
 		[ "$temp_pass" ] && zenity --info --title='Temporary password' --text="Your new Tails persistent storage has been encrypted with the temporary password:\n\n<big><big><big><big><b>${temp_pass::4}</b></big>${temp_pass:4:4}<big><b>${temp_pass:8:4}</b></big>${temp_pass:12:4}<big><b>${temp_pass:16:4}</b></big>${temp_pass:20}</big></big></big>\n\nPlease write this down or use it to log-in to the new clone. You will be asked to create a new passphrase on first log-in." --width=400 &
-		rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt" #FIXME this needs to be changed to copy just bitcoin/{blocks,indexes,chainstate}, dotfiles (which includes this script), and installed software packages
+		sudo rsync -PaSHAXv --del /live/persistence/TailsData_unlocked/ "$mnt_pnt" #FIXME this needs to be changed to copy just bitcoin/{blocks,indexes,chainstate}, dotfiles (which includes this script), and installed software packages
 		udisksctl power-off --block-device $device
 		zenity --title='Cloning complete!' --info --text="'$dev_name' device ($device) can now be safely removed from the computer.\n\nNote: Always keep this device physically secure. If an attacker modifies it while left unattended and you use it, you could lose privacy or funds."
 	fi

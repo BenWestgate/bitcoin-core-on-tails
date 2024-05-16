@@ -1,3 +1,14 @@
+class Bitcoin(Feature):
+    Id = "Bitcoin"
+    Mounts = [Mount("Persistent/.bitcoin", "/home/amnesia/.bitcoin")]
+    conflicting_apps = [
+        ConflictingApp(name="Bitcoin Core", process_names=["bitcoin-qt"]),
+        ConflictingApp(name="Bitcoin Core Daemon", process_names=["bitcoind"])
+        enabled_by_default = True
+    ]
+    
+
+
 #!/bin/bash
 # Copyright (c) 2022 Ben Westgate
 #
@@ -109,6 +120,7 @@ setup_persist_fs() {
 /home/amnesia/.config/Bitcoin	source=Persistent/.config/Bitcoin
 /usr/local	source=local
 /etc/xdg/autostart	source=autostart" | sudo tee --append persistence.conf
+	zenity --info --text='check the persistence.conf'
 #	sudo awk '!a[$0]++' persistence.conf | sudo tee persistence.conf	# removes duplicate entries
 	temp_file=$(mktemp)
 	sudo cat persistence.conf >$temp_file
@@ -299,9 +311,8 @@ To Confirm Enter the $(tput setaf 1)Cost$(tput sgr0) Estimate from above: $(tput
 	passphrase $dice_words
 }
 password_success() {
-	sudo --askpass passwd amnesia <<< "$pass
-$pass" &>>log
-	sudo mv /usr/local/bin/askpass{.bak,}	# restores the original askpass.
+	sudo passwd amnesia <<< "$pass
+$pass" >>log
 	# spaced repetition memory trainer
 	while true; do
 		sleep $timeout
@@ -531,8 +542,8 @@ download() {
 	wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=SHA256SUMS* --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
 	cd "$(ls -dt bitcoin-core* | head -1)"
 	# get builder-keys and delete shitcoiners
-	wget --continue https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/verify-commits/trusted-keys
-	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" trusted-keys >keys
+	wget --continue https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/builder-keys/keys.txt
+	grep -v "Akira Takizawa \| Gavin Andresen \| Willy Ko\|Matt Corallo" keys.txt >keys
 	gpg --refresh-keys	# refresh keys in keyring to see if any were revoked
 	verify $1 # finds 2 trustworthy attestations from keys.txt for the download checksum
 	cd -
@@ -548,6 +559,7 @@ download() {
 Bitcoin Core is the original Bitcoin client and it builds the backbone of the network. It will download and process the entire history of Bitcoin transactions, currently a few hundred gigabytes.\n\nDepending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.\n\nThis initial synchronisation is very demanding, and may expose hardware problems with your computer that had previously gone unnoticed. Each time you run Bitcoin Core, it will continue downloading where it left off.\n\nLimiting block chain storage to $prune_GB GB (<b>sufficient to restore backups $backup_days days old</b>)" --width=552; } &>/dev/null &
 	# brings the started in background download to foreground so user can see progress.
 	ps -p $dl >/dev/null && fg %$(jobs -l | grep $dl | cut -f1 -d' ' | tr -c -d '[:digit:]') || wget --continue --no-host-directories --cut-dirs=1 --recursive --level=1 --accept=x86_64-linux-gnu.tar.gz --include-directories=bin http://6hasakffvppilxgehrswmffqurlcjjjhd76jgvaqmsg6ul25s7t3rzyd.onion/en/download/
+	rm -R download ./*.tmp
 	cd "$(ls -dt bitcoin-core* | head -1)"
 	sha256sum --ignore-missing --check SHA256SUMS || {
 		echo "Download Integrity Failure: Checksum does not match what was expected."
@@ -561,7 +573,7 @@ Bitcoin Core is the original Bitcoin client and it builds the backbone of the ne
 		pkill bitcoin*
 		sleep 1
 	done
-	sudo --askpass tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/usr/local
+	sudo tar -xf bitcoin-*-x86_64-linux-gnu.tar* --strip-components=1 --directory=/usr/local
 	cd -
 	{
 		sleep 5
@@ -659,24 +671,11 @@ test -f /usr/local/bin/bitcoin-qt && cd $HOME/Persistent || {
 }
 echo '#!/bin/bash
 zenity --notification --text="Enter your administration password"
-zenity --password --title="Bitcoin Core on Tails"' >askpass.bak
-
-
-# removes prompting for every sudo password every command -- only prompts once if correct.
-until sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log; do
-	admin_pw=$(bash askpass.bak)
-	echo '#!/bin/bash
-printf '$admin_pw > askpass
-	chmod +x askpass
-done
-sudo --askpass mv askpass /usr/local/bin/askpass
-sudo --askpass mv askpass.bak /usr/local/bin/askpass.bak
+zenity --password --title="Bitcoin Core on Tails"' >askpass
+chmod +x askpass
+sudo --askpass mv /etc/sudoers.d/always-ask-password{,.bak} &>>log && sudo --askpass echo # removes prompting for every sudo password every command, asks second time if file renamed
+sudo mv askpass /usr/local/bin/askpass
 sudo chmod +x /usr/local/bin/askpass
-export SUDO_ASKPASS=/usr/local/bin/askpass
-zenity --question --title='Self-Custody warning' --text='With bitcoin, you are your own bank. No one else has access to your private keys.\n\nDo you understand?' || exit 1
-zenity --question --title='Self-Custody warning' --text='If you lose access to this USB stick and the backup we will help you create, your bitcoin cannot be recovered.\n\nDo you understand?'
-zenity --question --title='Back up your wallet to cloud storage' --text='Regularly saves an encrypted copy of your wallet to your cloud account. Allows for easy recovery in case you lose acces to this device.' --cancel-label='Do this later' --OK-label='Online Accounts'
-# I think using deja-dup + mounting the cloud accounts will work well enough. or one of the 
 [ "$1" == '--download' ] && {
 	download 2
 	gtk-launch bitcoin-qt
@@ -716,6 +715,7 @@ else
 fi
 if mount | grep '/dev/mapper/TailsData_unlocked on /live/persistence/TailsData_unlocked'; then
 	until wget --timestamping --wait=$((++k)) --waitretry=60 --random-wait --retry-connrefused https://raw.githubusercontent.com/bitcoin/bitcoin/master/src/chainparams.cpp; do sleep $((++k * (RANDOM % 3 + 1) / 2)); done & get_size=$!
+	zenity --info --text "about to setup $mnt_pnt"
 	setup_persist_fs
 	if $new_pw; then
 		echo "TAILS_USER_PASSWORD='"$(sudo tail -1 /etc/shadow | cut -f2 -d:)"'
@@ -768,7 +768,7 @@ if [ "$1" == '--backup' ] || [ "$1" == '--clone' ]; then
 	device=$(tails-installer --verbose 2>&1 | grep 'INFO: Resetting Master Boot Record of' | awk '{print $NF}')
 	[ "$device" ] || exit 1                                                                                     # quit if no device was flashed
 	dev_name="$(lsblk --path --nodeps --noheading --output=SIZE,VENDOR,MODEL,LABEL "$device")"                  # Use this to remind user which device is safe to eject after backup or cloning.
-	if [ $(lsblk --raw $device | grep -c part) -eq 1 ]; then
+	if [ $(lsblk --raw $RUNNING_DEVICE | grep -c part) -eq 1 ]; then
 		add_part $device $temp_pass /media/amnesia/TailsData	# new persistent file system will be mounted at $mnt_pnt
 	elif [ "$(echo 'i
 
