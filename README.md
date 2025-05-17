@@ -1,6 +1,9 @@
 # Bitcoin Core on Tails
 
-This repository contains a script for installing Bitcoin Core to Tails.
+This deprecated repository contains a script for installing Bitcoin Core to Tails.
+
+Currently Recommend to use:
+https://github.com/BenWestgate/bails
 
 
 Bitcoin Core connects to the Bitcoin peer-to-peer network to download and fully validate blocks and transactions. It also includes a wallet and graphical user interface.
